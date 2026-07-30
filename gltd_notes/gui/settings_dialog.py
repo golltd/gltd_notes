@@ -78,7 +78,7 @@ class SettingsDialog(Gtk.Dialog):
         self.close_tray_cb.set_active(bool(gui.get("close_to_tray", True)))
         box.pack_start(self.close_tray_cb, False, False, 0)
 
-        save = Gtk.Button(label=t("save_language"))
+        save = Gtk.Button(label=t("save_settings"))
         save.connect("clicked", self._on_save_interface)
         box.pack_start(save, False, False, 0)
         self.iface_status = Gtk.Label(label="", xalign=0)
@@ -101,7 +101,7 @@ class SettingsDialog(Gtk.Dialog):
             mw = self.get_transient_for()
             if isinstance(mw, MainWindow):
                 mw._apply_theme()
-        self.iface_status.set_text(t("language_saved"))
+        self.iface_status.set_text(t("settings_saved"))
         self.emit("response", Gtk.ResponseType.APPLY)
 
     def _page_security(self) -> Gtk.Widget:
