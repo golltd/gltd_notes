@@ -1,6 +1,61 @@
 #!/usr/bin/env bash
-# Auto-bump version before each commit
+# ── GLTD Notes pre-commit hook ──────────────────────────────────
+# Rules:
+#   1. Auto-bump patch version in _version.py and pyproject.toml
+#   2. Reject commits to 'main' unless GLTD_COMMIT_MAIN=1 is set
+#      (AI agents must switch to 'indev' for automatic commits)
+#   3. Scan for personal data (safety net)
 set -euo pipefail
+
 ROOT="$(git rev-parse --show-toplevel)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
+# ── Block commits to 'main' without explicit permission ──────
+if [ "$BRANCH" = "main" ] && [ "${GLTD_COMMIT_MAIN:-0}" != "1" ]; then
+    echo "============================================" >&2
+    echo "  COMMIT BLOQUEADO — branch 'main'" >&2
+    echo "============================================" >&2
+    echo "" >&2
+    echo "Commits em 'main' exigem permissao explicita." >&2
+    echo "Use 'indev' para commits automaticos:" >&2
+    echo "" >&2
+    echo "  git checkout indev" >&2
+    echo "  git add -A && git commit -m '...'" >&2
+    echo "" >&2
+    echo "OU autorize o commit em main com:" >&2
+    echo "" >&2
+    echo "  GLTD_COMMIT_MAIN=1 git commit -m '...'" >&2
+    echo "" >&2
+    exit 1
+fi
+
+# ── Scan for personal data patterns (safety net) ────────────
+if git diff --cached --name-only | head -50 | xargs grep -l \
+    -e '/home/[a-z][a-z]*/' \
+    -e '192\.168\.[0-9]' \
+    -e '10\.[0-9]' \
+    -e 'MariaDB@' \
+    -e 'senha:' \
+    -e 'password:' \
+    -e 'mint-pc' \
+    2>/dev/null; then
+    echo "" >&2
+    echo "============================================" >&2
+    echo "  ALERTA: possiveis dados pessoais detectados" >&2
+    echo "============================================" >&2
+    echo "" >&2
+    echo "Os arquivos acima contem padroes que parecem dados pessoais." >&2
+    echo "Use 192.0.2.0/24 para IPs, ~/gltd_notes_data/ para paths," >&2
+    echo "SEU_USUARIO para usernames, e nunca commite senhas." >&2
+    echo "" >&2
+    echo "Para ignorar este aviso:" >&2
+    echo "  GLTD_SKIP_SCAN=1 git commit -m '...'" >&2
+    echo "" >&2
+    if [ "${GLTD_SKIP_SCAN:-0}" != "1" ]; then
+        exit 1
+    fi
+fi
+
+# ── Bump version ───────────────────────────────────────────
 "$ROOT/scripts/bump_version.sh" > /dev/null
 git add "$ROOT/gltd_notes/_version.py" "$ROOT/pyproject.toml"

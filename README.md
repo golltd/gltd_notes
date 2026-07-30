@@ -191,6 +191,23 @@ The patch number is managed automatically by `.githooks/pre-commit`, which runs 
 
 ---
 
+## Repository Branches (AI Agent Rules)
+
+This repository uses two branches:
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | **Stable, tested code only.** Commits here only when the user explicitly requests with phrases like "commit to main", "merge to main", "go to production". |
+| `indev` | **In-development code and planning.** Code here may be incomplete, not yet operational, or under testing. **Automatic commits (bump, pre-commit hooks) go to `indev` by default.** |
+
+**Law for AI agents (Grok, DeepSeek, and any assistant):**
+
+1. The default commit target is `indev`. Never commit to `main` unless the user explicitly asks.
+2. The pre-commit hook will reject commits to `main` unless `GLTD_COMMIT_MAIN=1` is set.
+3. **Never commit personal information** — no real IPs, passwords, hostnames, personal file paths, or real usernames in any branch. Use `192.0.2.0/24` (RFC 5737) for example IPs, `~/gltd_notes_data/` for paths, `YOUR_USER` for usernames. This applies to code, comments, docs, and commit messages.
+
+---
+
 ## Donations
 
 If GLTD Notes is useful to you, consider supporting its development:

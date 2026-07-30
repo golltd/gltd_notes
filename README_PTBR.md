@@ -191,6 +191,23 @@ O numero de patch e gerenciado automaticamente pelo `.githooks/pre-commit`, que 
 
 ---
 
+## Branches do Repositorio (Regras para Agentes IA)
+
+Este repositorio usa duas branches:
+
+| Branch | Proposito |
+|--------|-----------|
+| `main` | **Codigo estavel e testado.** Commits aqui somente quando o usuario solicitar explicitamente com frases como "comite em main", "merge na main", "va para producao". |
+| `indev` | **Codigo em desenvolvimento e planejamento.** Codigo pode estar incompleto, nao operacional ou em testes. **Commits automaticos (bump, hook) vao para `indev` por padrao.** |
+
+**Lei para agentes IA (Grok, DeepSeek e qualquer assistente):**
+
+1. O destino padrao de commits e `indev`. Nunca comite em `main` a menos que o usuario peca explicitamente.
+2. O hook pre-commit rejeitara commits em `main` a menos que `GLTD_COMMIT_MAIN=1` esteja definido.
+3. **Nunca comitar informacoes pessoais** — sem IPs reais, senhas, hostnames, caminhos pessoais ou nomes de usuario reais em nenhuma branch. Use `192.0.2.0/24` (RFC 5737) para IPs de exemplo, `~/gltd_notes_data/` para paths, `SEU_USUARIO` para usernames. Isto se aplica a codigo, comentarios, documentacao e mensagens de commit.
+
+---
+
 ## Doações
 
 Se o GLTD Notes for util para voce, considere apoiar o desenvolvimento:
