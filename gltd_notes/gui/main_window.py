@@ -315,6 +315,7 @@ class MainWindow(Gtk.Window):
         self.connect("destroy", self._on_destroy)
 
         self._build_ui()
+        self._setup_theme()
         self._set_editor_chrome_visible(False)
         self._update_lock_ui()
         self._start_api()
@@ -340,7 +341,92 @@ class MainWindow(Gtk.Window):
         if sess and sess.locked and self.config.user_has_password():
             self._enter_lock_screen()
 
-    # ── helpers ──────────────────────────────────────────────
+    # ── theme ─────────────────────────────────────────────────
+    _DARK_CSS = b"""
+    * {
+        background-color: #1e1e2e;
+        color: #cdd6f4;
+    }
+    toolbar, toolbutton, .toolbar, headerbar {
+        background-color: #181825;
+        color: #cdd6f4;
+        border-color: #313244;
+    }
+    toolbutton:hover, button:hover {
+        background-color: #313244;
+    }
+    menubar, menu, menuitem {
+        background-color: #1e1e2e;
+        color: #cdd6f4;
+    }
+    menuitem:hover {
+        background-color: #313244;
+    }
+    entry, textview {
+        background-color: #313244;
+        color: #cdd6f4;
+        border-color: #45475a;
+    }
+    treeview {
+        background-color: #1e1e2e;
+        color: #cdd6f4;
+    }
+    treeview:selected {
+        background-color: #45475a;
+        color: #cdd6f4;
+    }
+    notebook {
+        background-color: #1e1e2e;
+    }
+    notebook tab {
+        background-color: #181825;
+        color: #cdd6f4;
+    }
+    notebook tab:checked {
+        background-color: #313244;
+        color: #cdd6f4;
+    }
+    frame, scrolledwindow {
+        border-color: #313244;
+    }
+    statusbar {
+        background-color: #181825;
+        color: #a6adc8;
+    }
+    paned separator {
+        background-color: #313244;
+    }
+    combobox window, combobox menu {
+        background-color: #1e1e2e;
+        color: #cdd6f4;
+    }
+    .error { color: #f38ba8; }
+    .success { color: #a6e3a1; }
+    """
+
+    _LIGHT_CSS = b"""
+    entry, textview {
+        background-color: #ffffff;
+        color: #1e1e2e;
+    }
+    """
+
+    def _setup_theme(self) -> None:
+        self._css_provider = Gtk.CssProvider()
+        screen = Gdk.Screen.get_default()
+        style = Gtk.StyleContext()
+        style.add_provider_for_screen(screen, self._css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        theme = self.config.data.get("gui", {}).get("theme") or "default"
+        if theme == "dark":
+            self._css_provider.load_from_data(self._DARK_CSS)
+        elif theme == "light":
+            self._css_provider.load_from_data(self._LIGHT_CSS)
+        else:
+            self._css_provider.load_from_data(b"")
+        self.html_editor._apply_editor_theme(theme)
     def _tool_button(self, icon_name: str, label: str, cb) -> Gtk.ToolButton:
         img = icon_image(icon_name, 24)
         btn = Gtk.ToolButton.new(img, label)

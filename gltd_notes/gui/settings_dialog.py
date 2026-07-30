@@ -56,6 +56,24 @@ class SettingsDialog(Gtk.Dialog):
         self.lang_combo.set_active(active)
         box.pack_start(self.lang_combo, False, False, 0)
 
+        box.pack_start(Gtk.Label(label=t("theme"), xalign=0), False, False, 0)
+        self.theme_combo = Gtk.ComboBoxText()
+        themes = [
+            ("default", t("theme_default")),
+            ("light", t("theme_light")),
+            ("dark", t("theme_dark")),
+        ]
+        self._theme_codes = []
+        current_theme = gui.get("theme") or "default"
+        active_theme = 0
+        for i, (code, label) in enumerate(themes):
+            self.theme_combo.append_text(label)
+            self._theme_codes.append(code)
+            if code == current_theme:
+                active_theme = i
+        self.theme_combo.set_active(active_theme)
+        box.pack_start(self.theme_combo, False, False, 0)
+
         self.close_tray_cb = Gtk.CheckButton(label=t("close_to_tray"))
         self.close_tray_cb.set_active(bool(gui.get("close_to_tray", True)))
         box.pack_start(self.close_tray_cb, False, False, 0)
@@ -72,8 +90,17 @@ class SettingsDialog(Gtk.Dialog):
         code = self._lang_codes[idx] if 0 <= idx < len(self._lang_codes) else "auto"
         self.config.data.setdefault("gui", {})["language"] = code
         self.config.data["gui"]["close_to_tray"] = self.close_tray_cb.get_active()
+        tidx = self.theme_combo.get_active()
+        theme_code = self._theme_codes[tidx] if 0 <= tidx < len(self._theme_codes) else "default"
+        changed = (self.config.data["gui"].get("theme") != theme_code)
+        self.config.data["gui"]["theme"] = theme_code
         self.config.save()
         get_i18n(code)
+        if changed:
+            from gltd_notes.gui.main_window import MainWindow
+            mw = self.get_transient_for()
+            if isinstance(mw, MainWindow):
+                mw._apply_theme()
         self.iface_status.set_text(t("language_saved"))
         self.emit("response", Gtk.ResponseType.APPLY)
 

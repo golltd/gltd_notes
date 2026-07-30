@@ -77,6 +77,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "Idioma salvo. Reinicie a janela se alguns textos não atualizarem.",
         "items_open": "{n} em aberto",
         "of_total": "de {n}",
+        "theme": "Tema",
+        "theme_default": "Padrão do sistema",
+        "theme_light": "Claro",
+        "theme_dark": "Escuro",
     },
     "en": {
         "app_name": "GLTD Notes",
@@ -148,6 +152,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "Language saved. Restart the window if some labels do not update.",
         "items_open": "{n} open",
         "of_total": "of {n}",
+        "theme": "Theme",
+        "theme_default": "System default",
+        "theme_light": "Light",
+        "theme_dark": "Dark",
     },
     "es": {
         "app_name": "GLTD Notes",
@@ -219,6 +227,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "Idioma guardado. Reinicie la ventana si no se actualizan las etiquetas.",
         "items_open": "{n} abiertas",
         "of_total": "de {n}",
+        "theme": "Tema",
+        "theme_default": "Predeterminado del sistema",
+        "theme_light": "Claro",
+        "theme_dark": "Oscuro",
     },
     "de": {
         "app_name": "GLTD Notes",
@@ -290,6 +302,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "Sprache gespeichert. Fenster neu starten falls nötig.",
         "items_open": "{n} offen",
         "of_total": "von {n}",
+        "theme": "Thema",
+        "theme_default": "Systemstandard",
+        "theme_light": "Hell",
+        "theme_dark": "Dunkel",
     },
     "zh": {
         "app_name": "GLTD Notes",
@@ -361,6 +377,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "语言已保存。如果某些标签未更新，请重新启动窗口。",
         "items_open": "{n} 个待办",
         "of_total": "共 {n} 个",
+        "theme": "主题",
+        "theme_default": "系统默认",
+        "theme_light": "浅色",
+        "theme_dark": "深色",
     },
     "ja": {
         "app_name": "GLTD Notes",
@@ -432,6 +452,10 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "language_saved": "言語を保存しました。表示が変わらない場合は再起動してください。",
         "items_open": "{n} 件未完了",
         "of_total": "/ {n}",
+        "theme": "テーマ",
+        "theme_default": "システム既定",
+        "theme_light": "ライト",
+        "theme_dark": "ダーク",
     },
 }
 

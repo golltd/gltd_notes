@@ -18,11 +18,7 @@ except ValueError:
     gi.require_version("WebKit2", "4.0")
 from gi.repository import WebKit2  # noqa: E402
 
-EDITOR_HTML = """<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<style>
+_EDITOR_CSS_DARK = """
   html, body {
     margin: 0; padding: 0; height: 100%;
     background: #1a1b26; color: #c0caf5;
@@ -30,10 +26,8 @@ EDITOR_HTML = """<!DOCTYPE html>
     font-size: 15px; line-height: 1.55;
   }
   #ed {
-    min-height: 100%;
-    box-sizing: border-box;
-    padding: 14px 16px 40px;
-    outline: none;
+    min-height: 100%; box-sizing: border-box;
+    padding: 14px 16px 40px; outline: none;
   }
   #ed:empty:before {
     content: attr(data-placeholder);
@@ -63,10 +57,67 @@ EDITOR_HTML = """<!DOCTYPE html>
     margin: 0.5em 0; padding: 0.3em 0.8em;
     border-left: 3px solid #7aa2f7; color: #a9b1d6;
   }
-</style>
+"""
+
+_EDITOR_CSS_LIGHT = """
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #ffffff; color: #1e1e2e;
+    font-family: system-ui, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  #ed {
+    min-height: 100%; box-sizing: border-box;
+    padding: 14px 16px 40px; outline: none;
+  }
+  #ed:empty:before {
+    content: attr(data-placeholder);
+    color: #acb0b8;
+  }
+  h1 { font-size: 1.55em; color: #1e66f5; margin: 0.6em 0 0.35em; font-weight: 700; }
+  h2 { font-size: 1.28em; color: #7c3aed; margin: 0.55em 0 0.3em; font-weight: 700; }
+  h3 { font-size: 1.1em; color: #0891b2; margin: 0.5em 0 0.25em; font-weight: 600; }
+  p { margin: 0.35em 0; }
+  ul, ol { margin: 0.4em 0 0.4em 1.4em; padding: 0; }
+  li { margin: 0.2em 0; }
+  b, strong { color: #c96000; }
+  i, em { color: #107a3e; }
+  u { text-decoration-color: #1e66f5; }
+  code, pre {
+    font-family: ui-monospace, "DejaVu Sans Mono", monospace;
+    background: #f0f0f5; border-radius: 4px;
+  }
+  code { padding: 0.1em 0.35em; font-size: 0.92em; }
+  pre { padding: 10px 12px; overflow-x: auto; }
+  a { color: #1e66f5; }
+  .hashtag {
+    color: #0d7377; background: rgba(13, 115, 119, 0.1);
+    border-radius: 4px; padding: 0 4px; font-weight: 600;
+  }
+  blockquote {
+    margin: 0.5em 0; padding: 0.3em 0.8em;
+    border-left: 3px solid #1e66f5; color: #5c5f77;
+  }
+"""
+
+
+def _editor_css(theme: str) -> str:
+    if theme == "light":
+        return _EDITOR_CSS_LIGHT
+    return _EDITOR_CSS_DARK
+
+
+def _build_editor_html(theme: str) -> str:
+    css = _editor_css(theme)
+    return """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+""" + css + """</style>
 </head>
 <body>
-<div id="ed" contenteditable="true" data-placeholder="Escreva a nota… (HTML: títulos, negrito, listas, #marcadores)"></div>
+<div id="ed" contenteditable="true" data-placeholder="Escreva a nota... (HTML: titulos, negrito, listas, #marcadores)"></div>
 <script>
 (function() {
   const ed = document.getElementById('ed');
@@ -82,11 +133,6 @@ EDITOR_HTML = """<!DOCTYPE html>
   function scheduleNotify() {
     if (notifyTimer) clearTimeout(notifyTimer);
     notifyTimer = setTimeout(notify, 500);
-  }
-
-  // Highlight #hashtags in plain text nodes (lightweight)
-  function decorateHashtags() {
-    // avoid fighting the user mid-edit — only on blur
   }
 
   ed.addEventListener('keydown', function(e) {
@@ -110,25 +156,17 @@ EDITOR_HTML = """<!DOCTYPE html>
   ed.addEventListener('keyup', scheduleNotify);
   ed.addEventListener('paste', function() { setTimeout(scheduleNotify, 50); });
 
-  window.__setHtml = function(html) {
-    ed.innerHTML = html || '';
-  };
+  window.__setHtml = function(html) { ed.innerHTML = html || ''; };
   window.__setHtmlB64 = function(b64) {
     try {
       const bin = atob(b64 || '');
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       ed.innerHTML = new TextDecoder('utf-8').decode(bytes);
-    } catch (e) {
-      ed.innerHTML = '';
-    }
+    } catch (e) { ed.innerHTML = ''; }
   };
-  window.__getHtml = function() {
-    return ed.innerHTML;
-  };
-  window.__getText = function() {
-    return ed.innerText || '';
-  };
+  window.__getHtml = function() { return ed.innerHTML; };
+  window.__getText = function() { return ed.innerText || ''; };
   window.__focus = function() { ed.focus(); };
   window.__exec = function(cmd, val) {
     ed.focus();
@@ -186,6 +224,7 @@ class HtmlNoteEditor(Gtk.Box):
         self._ready = False
         self._pending_html: Optional[str] = None
         self._change_guard = False
+        self._editor_theme = "dark"
 
         # formatting toolbar
         tb = Gtk.Box(spacing=4)
@@ -245,7 +284,7 @@ class HtmlNoteEditor(Gtk.Box):
         self.web.set_vexpand(True)
         self.pack_start(self.web, True, True, 0)
 
-        self.web.load_html(EDITOR_HTML, "file:///")
+        self.web.load_html(_build_editor_html(self._editor_theme), "file:///")
         self.show_all()
 
     def _on_load_changed(self, _web, event) -> None:
@@ -309,6 +348,18 @@ class HtmlNoteEditor(Gtk.Box):
     def _clear_loading(self) -> bool:
         self._loading = False
         return False
+
+    def _apply_editor_theme(self, theme: str) -> None:
+        if theme == self._editor_theme:
+            return
+        self._editor_theme = theme
+        if self._ready:
+            self.get_html_async(lambda html: self._reload_with_theme(html))
+
+    def _reload_with_theme(self, html: str) -> None:
+        self._ready = False
+        self.web.load_html(_build_editor_html(self._editor_theme), "file:///")
+        self._pending_html = html
 
     def get_html_async(self, callback: Callable[[str], None]) -> None:
         if not self._ready:
