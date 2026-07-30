@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gltd-notes"
+version = "0.1.6"
+description = "Private, open-source GNote alternative with GTK UI, REST API and Syncthing-friendly blockchain storage"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "GLTD" }]
+keywords = ["notes", "gnote", "gtk", "syncthing", "privacy"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Office/Business :: Groupware",
+]
+dependencies = []
+
+[project.scripts]
+gltd-notes = "gltd_notes.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["gltd_notes*"]

@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>GLTD Notes Web</title>
+<style>
+:root {
+  --bg:#1a1b26; --fg:#c0caf5; --muted:#565f89; --accent:#7aa2f7;
+  --card:#24283b; --ok:#9ece6a; --warn:#e0af68; --err:#f7768e; --line:#3b4261;
+  --sub:#414868;
+}
+* { box-sizing: border-box; }
+html, body { height:100%; margin:0; }
+body {
+  font-family: system-ui, "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--fg);
+  overflow: hidden;
+}
+button, input, select, textarea {
+  font: inherit; color: var(--fg);
+  background: #1f2335; border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 12px;
+}
+button {
+  background: var(--accent); color: #1a1b26; border: none;
+  font-weight: 600; cursor: pointer;
+}
+button.secondary { background: var(--sub); color: var(--fg); }
+button.danger { background: var(--err); color: #1a1b26; }
+button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:hover:not(:disabled) { filter: brightness(1.08); }
+
+#login {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 30% 20%, #24283b 0%, #1a1b26 55%, #0f1018 100%);
+  padding: 16px;
+}
+#login.hidden { display: none; }
+.login-card {
+  width: min(460px, 100%);
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 28px 26px 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.login-card h1 { margin: 0; font-size: 1.45rem; }
+.login-card .sub { color: var(--muted); font-size: .92rem; margin: 0 0 6px; line-height: 1.4; }
+.login-card label { font-size: .82rem; color: var(--muted); }
+.login-card .err { color: var(--err); min-height: 1.2em; font-size: .9rem; }
+.login-card .hint { color: var(--muted); font-size: .8rem; line-height: 1.35; }
+.user-pick {
+  border: 1px solid var(--line); border-radius: 10px; max-height: 180px; overflow: auto;
+  background: #1f2335;
+}
+.user-pick .opt {
+  padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #292e42;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.user-pick .opt:last-child { border-bottom: none; }
+.user-pick .opt:hover, .user-pick .opt.sel { background: #292e42; }
+.user-pick .opt .name { font-weight: 600; }
+.user-pick .opt .meta { font-size: .78rem; color: var(--muted); word-break: break-all; }
+
+#app { display: none; height: 100vh; grid-template-rows: auto auto 1fr auto; }
+#app.on { display: grid; }
+.topbar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 14px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.topbar .brand { font-weight: 700; margin-right: 8px; }
+.topbar .userinfo { color: var(--muted); font-size: .85rem; margin-left: auto; }
+.nav { display: flex; gap: 6px; flex-wrap: wrap; }
+.nav button { background: var(--sub); color: var(--fg); }
+.nav button.active { background: var(--accent); color: #1a1b26; }
+.toolbar {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  padding: 8px 14px; background: #1f2335; border-bottom: 1px solid var(--line);
+}
+.toolbar input[type=search], .toolbar input[type=text] { min-width: 180px; flex: 1; }
+.status { color: var(--muted); font-size: .85rem; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+
+/* Tabs bar */
+.tab-bar { display: flex; gap: 0; overflow-x: auto; padding: 4px 8px 0; background: #1a1b26; border-bottom: 1px solid var(--line); min-height: 34px; align-items: flex-end; }
+.tab-bar .tab {
+  padding: 6px 10px; font-size: .85rem; white-space: nowrap; cursor: pointer;
+  border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0;
+  background: #1f2335; color: var(--muted); margin-right: 2px; position: relative;
+  display: flex; align-items: center; gap: 4px; max-width: 200px;
+}
+.tab-bar .tab.active { background: var(--card); color: var(--fg); }
+.tab-bar .tab span { overflow: hidden; text-overflow: ellipsis; }
+.tab-bar .tab .tab-close { font-size: .75rem; color: var(--muted); cursor: pointer; padding: 0 2px; }
+.tab-bar .tab .tab-close:hover { color: var(--err); }
+
+.views { min-height: 0; height: 100%; position: relative; }
+.view { display: none; height: 100%; min-height: 0; }
+.view.active { display: grid; }
+
+#view-home {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 12px; padding: 14px; overflow: auto;
+}
+.card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px;
+}
+.card h2 { margin: 0 0 10px; font-size: 1rem; }
+.card.full { grid-column: 1 / -1; }
+.dash-item {
+  padding: 8px 0; border-bottom: 1px solid #292e42; font-size: .92rem;
+}
+.dash-item .m { color: var(--muted); font-size: .78rem; }
+.quick { display: flex; gap: 8px; flex-wrap: wrap; }
+.item {
+  padding: 10px 12px; border-bottom: 1px solid #292e42; cursor: pointer;
+}
+.item:hover, .item.active { background: #292e42; }
+.item .title { font-weight: 500; }
+.item .meta { color: var(--muted); font-size: .76rem; margin-top: 2px; }
+
+#view-notes {
+  grid-template-columns: 300px minmax(0,1fr) 260px;
+  min-height: 0;
+}
+.panel { overflow: auto; border-right: 1px solid var(--line); min-height: 0; }
+.panel.side { border-right: none; border-left: 1px solid var(--line); padding: 12px; font-size: .88rem; }
+.editor {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px; min-height: 0; overflow: auto;
+}
+.editor input { width: 100%; }
+.fmt { display: flex; gap: 4px; flex-wrap: wrap; }
+.fmt button { background: var(--sub); color: var(--fg); padding: 4px 9px; font-size: .85rem; }
+#bodyHtml {
+  flex: 1; min-height: 260px; background: #1f2335; border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px; overflow: auto; outline: none;
+  line-height: 1.5;
+}
+#bodyHtml:empty:before { content: attr(data-ph); color: var(--muted); }
+#bodyHtml h1 { color: #7aa2f7; font-size: 1.4em; margin: .4em 0; }
+#bodyHtml h2 { color: #bb9af7; font-size: 1.2em; margin: .4em 0; }
+#bodyHtml b, #bodyHtml strong { color: #e0af68; }
+.side h3 { margin: 12px 0 6px; font-size: .92rem; }
+.side h3:first-child { margin-top: 0; }
+.hist {
+  padding: 6px 0; border-bottom: 1px solid #292e42; cursor: pointer; font-size: .82rem;
+}
+.hist:hover { color: var(--accent); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Agent UI */
+.agent-nav-bar { display: none; align-items: center; gap: 8px; padding: 6px 0; }
+.agent-nav-bar.on { display: flex; }
+.agent-nav-bar button { background: var(--sub); color: var(--fg); font-size: .85rem; }
+.agent-output {
+  background: #1a1b26; border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px; min-height: 160px; max-height: 260px; overflow: auto;
+  font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: .85rem;
+  white-space: pre-wrap; word-break: break-all;
+}
+.agent-status-footer {
+  display: none; padding: 4px 10px; font-size: .82rem;
+  font-weight: 600; border-radius: 4px;
+}
+.agent-status-footer.on { display: block; }
+.subtask-row {
+  padding: 6px 8px; border-bottom: 1px solid #292e42; cursor: pointer;
+  display: flex; gap: 8px; align-items: center; font-size: .88rem;
+}
+.subtask-row:hover { background: #292e42; }
+.subtask-row .st-meta { color: var(--muted); font-size: .78rem; }
+.inline-form {
+  display: none; flex-direction: column; gap: 6px; padding: 8px 4px;
+  border-top: 1px solid var(--line); margin-top: 4px;
+}
+.inline-form.on { display: flex; }
+
+#view-events, #view-tasks, #view-agents {
+  padding: 14px; overflow: auto; align-content: start; gap: 12px;
+  grid-template-columns: 1fr;
+}
+@media (max-width: 960px) {
+  #view-notes { grid-template-columns: 1fr; grid-template-rows: 180px 1fr auto; }
+  #view-home { grid-template-columns: 1fr; }
+  .panel.side { border-left: none; border-top: 1px solid var(--line); max-height: 200px; }
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <h1>GLTD Notes</h1>
+    <p class="sub">
+      Use o <b>usuário e a senha</b> da interface desktop.<br/>
+      Sem API key. Apenas localhost.
+    </p>
+    <label>Usuário</label>
+    <div class="user-pick" id="userPick">
+      <div class="opt"><span class="meta">Carregando…</span></div>
+    </div>
+    <input id="loginUser" autocomplete="username" placeholder="Usuário"/>
+    <label>Senha</label>
+    <input id="loginPass" type="password" autocomplete="current-password" placeholder="Senha do desktop"/>
+    <div class="err" id="loginErr"></div>
+    <button id="loginBtn" style="width:100%; padding:12px">Entrar</button>
+    <p class="hint" id="loginHint">Acesso apenas em localhost</p>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <span class="brand">GLTD Notes</span>
+    <div class="nav">
+      <button data-view="home" class="active">Início</button>
+      <button data-view="notes">Notas</button>
+      <button data-view="tasks">Tarefas</button>
+      <button data-view="events">Eventos</button>
+      <button data-view="agents">Agentes</button>
+    </div>
+    <span class="userinfo" id="userLabel"></span>
+    <button class="ghost" id="logoutBtn">Sair</button>
+  </div>
+
+  <div class="toolbar" id="notesBar">
+    <input type="search" id="q" placeholder="Buscar notas, marcadores #linux…"/>
+    <button id="searchBtn">Buscar</button>
+    <button id="newNoteBtn">Nova nota</button>
+    <button class="secondary" id="newTaskBtn">Lista de tarefas</button>
+    <button class="secondary" id="newAgentBtn">Tarefa agente</button>
+    <button id="saveBtn">Salvar</button>
+    <button class="danger" id="delBtn">Excluir</button>
+    <span class="status" id="status"></span>
+  </div>
+
+  <div class="tab-bar" id="tabBar"></div>
+
+  <div class="views">
+    <!-- HOME -->
+    <div class="view active" id="view-home">
+      <div class="card">
+        <h2>Tarefas em aberto</h2>
+        <div id="dashTasks"></div>
+      </div>
+      <div class="card">
+        <h2>Próximos eventos</h2>
+        <div id="dashEvents"></div>
+      </div>
+      <div class="card full">
+        <h2>Atalhos</h2>
+        <div class="quick">
+          <button id="homeNewNote">Nova nota</button>
+          <button class="secondary" id="homeNewTask">Lista de tarefas</button>
+          <button class="secondary" id="homeNewAgent">Tarefa agente</button>
+          <button class="secondary" id="homeEvents">Eventos</button>
+          <button class="ghost" id="homeNotes">Abrir notas</button>
+        </div>
+        <p class="status" id="homeInfo" style="margin-top:12px"></p>
+      </div>
+      <div class="card full">
+        <h2>Notas recentes</h2>
+        <div id="dashRecent"></div>
+      </div>
+    </div>
+
+    <!-- NOTES -->
+    <div class="view" id="view-notes">
+      <div class="panel" id="noteList"></div>
+      <div class="editor">
+        <input id="title" placeholder="Título"/>
+        <input id="markers" placeholder="Marcadores: #linux #php #rede …"/>
+        <div class="fmt">
+          <button type="button" data-cmd="bold"><b>B</b></button>
+          <button type="button" data-cmd="italic"><i>I</i></button>
+          <button type="button" data-cmd="underline"><u>U</u></button>
+          <button type="button" data-cmd="formatBlock" data-val="H1">H1</button>
+          <button type="button" data-cmd="formatBlock" data-val="H2">H2</button>
+          <button type="button" data-cmd="formatBlock" data-val="H3">H3</button>
+          <button type="button" data-cmd="insertUnorderedList">• Lista</button>
+          <button type="button" data-cmd="insertOrderedList">1. Lista</button>
+          <button type="button" data-cmd="formatBlock" data-val="BLOCKQUOTE">Citação</button>
+        </div>
+        <div id="bodyHtml" contenteditable="true" data-ph="Corpo da nota (formatação HTML)…"></div>
+        <!-- Agent editor overlay (hidden for non-agent notes) -->
+        <div id="agentEditorOverlay" style="display:none; flex-direction:column; gap:8px;">
+          <div class="row">
+            <select id="agAgent"></select>
+            <select id="agStatus"></select>
+            <button id="agPlay">▶ Play</button>
+            <button id="agCancel" class="danger" style="display:none">■ Cancelar</button>
+            <button class="secondary" id="agClearOutput">✕ Limpar Output</button>
+            <button class="secondary" id="agAddSubtask">＋ Subtarefa</button>
+          </div>
+          <div class="agent-nav-bar" id="agNavBar">
+            <button class="ghost" id="agNavBack">← Voltar</button>
+            <span id="agNavTitle" style="font-weight:600;"></span>
+          </div>
+          <label style="font-size:.85rem;color:var(--muted);">Descrição da tarefa:</label>
+          <textarea id="agDesc" rows="5" placeholder="Descreva o que o agente deve fazer…" style="width:100%;resize:vertical;"></textarea>
+          <label style="font-size:.85rem;color:var(--muted);">Subtarefas:</label>
+          <div id="agSubtasks" style="max-height:140px;overflow:auto;"></div>
+          <div class="inline-form" id="agInlineForm">
+            <input id="agSubTitle" placeholder="Título da subtarefa"/>
+            <input id="agSubDesc" placeholder="Descrição (opcional)"/>
+            <div class="row">
+              <button id="agSubAdd">Adicionar</button>
+              <button class="secondary" id="agSubCancel">Cancelar</button>
+            </div>
+          </div>
+          <label style="font-size:.85rem;color:var(--muted);">Output do agente:</label>
+          <div class="agent-output" id="agOutput"></div>
+          <div class="agent-status-footer" id="agStatusFooter"></div>
+        </div>
+        <div class="status" id="meta"></div>
+      </div>
+      <div class="panel side">
+        <h3>Detalhes</h3>
+        <div id="sideMeta">Selecione uma nota</div>
+        <h3>Versões</h3>
+        <div id="sideHist"></div>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="view" id="view-tasks">
+      <div class="card">
+        <h2>Listas de tarefas</h2>
+        <div class="row" style="margin-bottom:10px">
+          <button id="taskNewList">Nova lista de tarefas</button>
+        </div>
+        <div id="taskLists"></div>
+      </div>
+      <div class="card">
+        <h2>Itens em aberto (todas as listas)</h2>
+        <div id="taskOpen"></div>
+      </div>
+    </div>
+
+    <!-- EVENTS -->
+    <div class="view" id="view-events">
+      <div class="card">
+        <h2>Novo evento / lembrete</h2>
+        <div class="row">
+          <input id="evTitle" placeholder="Título" style="flex:1"/>
+          <input id="evWhen" placeholder="AAAA-MM-DDTHH:MM:SSZ" style="width:220px"/>
+          <button id="evAdd">Criar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Eventos</h2>
+        <div id="evList"></div>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div class="view" id="view-agents">
+      <div class="card">
+        <h2>Nova tarefa para agente</h2>
+        <div class="row">
+          <input id="agNewTitle" placeholder="Título" style="flex:1"/>
+          <select id="agNewAgent">
+            <option value="grok">grok</option>
+            <option value="gemini">gemini</option>
+            <option value="opencode-deepseek4">opencode-deepseek4</option>
+          </select>
+          <button id="agAdd">Criar</button>
+        </div>
+        <textarea id="agNewDesc" rows="4" placeholder="Descrição da tarefa para o agente…" style="width:100%;margin-top:8px"></textarea>
+      </div>
+      <div class="card">
+        <h2>Tarefas de agente</h2>
+        <div id="agList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = {
+  token: localStorage.getItem('gltd_web_token') || '',
+  user: null,
+  identities: [],
+  selectedUser: null,
+  notes: [],
+  current: null,
+  view: 'home',
+  saveTimer: null,
+  openTabs: [],       // [{id, title, kind}]
+  activeTabIdx: -1,
+  agentNavStack: [],  // [{id, body, children}]
+  agentTimerId: null,
+  agentStartTime: 0,
+  agentPolling: null,
+  _navInProgress: false,
+};
+
+const $ = id => document.getElementById(id);
+function setStatus(msg, kind) {
+  const el = $('status');
+  el.textContent = msg || '';
+  el.className = 'status' + (kind === true ? ' ok' : kind === false ? ' err' : '');
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+async function api(method, path, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (S.token) headers['X-Session-Token'] = S.token;
+  const res = await fetch('/proxy' + path, {
+    method, headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  let data = {};
+  try { data = await res.json(); } catch (_) { throw new Error(res.statusText || 'Erro de rede'); }
+  if (!res.ok || data.ok === false) throw new Error(data.error || res.statusText || 'Erro');
+  return data;
+}
+
+async function apiNoThrow(method, path, body) {
+  try { return await api(method, path, body); } catch (_) { return null; }
+}
+
+/* ── Login ── */
+function normalizeIdentity(raw, index) {
+  if (!raw) return null;
+  const username = raw.username || raw.label || raw.display_name || (`Conta ${index + 1}`);
+  return {
+    id: (raw.id && String(raw.id).startsWith('acct_')) ? raw.id : `acct_${index}`,
+    label: username, username: username,
+    has_password: raw.has_password !== false,
+  };
+}
+async function loadIdentities() {
+  const box = $('userPick');
+  try {
+    const data = await api('GET', '/api/v1/public/identities');
+    const rawList = data.identities || data.users || [];
+    S.identities = rawList.map((r, i) => normalizeIdentity(r, i)).filter(Boolean);
+    if (!S.identities.length) {
+      box.innerHTML = '<div class="opt"><span class="meta">Nenhuma conta configurada</span></div>';
+      return;
+    }
+    box.innerHTML = '';
+    S.identities.forEach((id, i) => {
+      const div = document.createElement('div');
+      div.className = 'opt' + (i === 0 ? ' sel' : '');
+      div.innerHTML = `<span class="name">${esc(id.username || id.label)}</span>
+        <span class="meta">${id.has_password ? 'Senha do desktop' : 'Sem senha'}</span>`;
+      div.onclick = () => {
+        box.querySelectorAll('.opt').forEach(o => o.classList.remove('sel'));
+        div.classList.add('sel');
+        S.selectedUser = id;
+        if (id.username) $('loginUser').value = id.username;
+      };
+      box.appendChild(div);
+    });
+    S.selectedUser = S.identities[0];
+    if (S.selectedUser.username) $('loginUser').value = S.selectedUser.username;
+    $('loginHint').textContent = 'Acesso apenas em localhost';
+  } catch (e) {
+    console.error(e);
+    box.innerHTML = `<div class="opt"><span class="meta">Erro ao carregar contas: ${esc(e.message)}</span></div>`;
+  }
+}
+async function doLogin() {
+  $('loginErr').textContent = '';
+  const password = $('loginPass').value;
+  const username = ($('loginUser').value || '').trim();
+  if (!username && !(S.selectedUser && S.selectedUser.id)) {
+    $('loginErr').textContent = 'Selecione ou digite o usuário.';
+    return;
+  }
+  try {
+    const payload = {
+      password,
+      username: username || (S.selectedUser && S.selectedUser.username) || undefined,
+      id: (S.selectedUser && S.selectedUser.id) || undefined,
+    };
+    const data = await api('POST', '/api/v1/login', payload);
+    if (!data.token) throw new Error('Resposta de login sem token');
+    S.token = data.token;
+    S.user = { username: data.username, user_hash: data.user_hash };
+    localStorage.setItem('gltd_web_token', S.token);
+    $('userLabel').textContent = data.username ? `Olá, ${data.username}` : 'Sessão ativa';
+    $('login').classList.add('hidden');
+    $('app').classList.add('on');
+    try { await refreshAll(); setView('home'); } catch (e2) {
+      console.error('post-login refresh', e2);
+      setStatus(e2.message || 'Aviso ao carregar dados', false);
+    }
+  } catch (e) {
+    console.error('login failed', e);
+    $('loginErr').textContent = e.message || 'Falha no login';
+  }
+}
+async function tryRestore() {
+  if (!S.token) return false;
+  try {
+    const me = await api('GET', '/api/v1/me');
+    S.user = { username: me.username, user_hash: me.user_hash };
+    $('userLabel').textContent = me.username ? `Olá, ${me.username}` : 'Sessão ativa';
+    $('login').classList.add('hidden');
+    $('app').classList.add('on');
+    await refreshAll();
+    return true;
+  } catch (_) {
+    S.token = '';
+    localStorage.removeItem('gltd_web_token');
+    return false;
+  }
+}
+async function logout() {
+  try { await api('POST', '/api/v1/logout', {}); } catch (_) {}
+  S.token = ''; S.user = null; S.current = null; S.notes = []; S.openTabs = []; S.agentNavStack = [];
+  localStorage.removeItem('gltd_web_token');
+  $('app').classList.remove('on');
+  $('login').classList.remove('hidden');
+  $('loginPass').value = '';
+  await loadIdentities();
+}
+
+/* ── Navigation ── */
+function setView(name) {
+  S.view = name;
+  document.querySelectorAll('.nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === name);
+  });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = $('view-' + name);
+  if (el) el.classList.add('active');
+  $('notesBar').style.display = (name === 'notes') ? 'flex' : 'none';
+  $('tabBar').style.display = (name === 'notes') ? 'flex' : 'none';
+  if (name === 'home') loadDashboard();
+  if (name === 'notes') { loadNotes(); renderTabs(); }
+  if (name === 'tasks') loadTasksView();
+  if (name === 'events') loadEvents();
+  if (name === 'agents') loadAgents();
+}
+async function refreshAll() {
+  await Promise.all([loadDashboard(), loadNotes()]);
+}
+
+/* ── Tabs ── */
+function renderTabs() {
+  const bar = $('tabBar');
+  bar.innerHTML = '';
+  if (!S.openTabs.length) return;
+  S.openTabs.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'tab' + (i === S.activeTabIdx ? ' active' : '');
+    div.innerHTML = `<span>${esc(t.title || '(sem título)')}</span><span class="tab-close">×</span>`;
+    div.querySelector('span').onclick = () => { S.activeTabIdx = i; openNote(t.id); renderTabs(); };
+    div.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeTab(i); };
+    bar.appendChild(div);
+  });
+}
+function findTabIdx(id) { return S.openTabs.findIndex(t => t.id === id); }
+function addTab(id, title, kind) {
+  const existing = findTabIdx(id);
+  if (existing >= 0) { S.activeTabIdx = existing; renderTabs(); return; }
+  S.openTabs.push({ id, title: title || '(sem título)', kind: kind || 'note' });
+  S.activeTabIdx = S.openTabs.length - 1;
+  renderTabs();
+}
+function closeTab(idx) {
+  if (idx < 0 || idx >= S.openTabs.length) return;
+  const wasActive = (idx === S.activeTabIdx);
+  S.openTabs.splice(idx, 1);
+  if (!S.openTabs.length) {
+    S.activeTabIdx = -1; S.current = null;
+  } else if (wasActive) {
+    S.activeTabIdx = Math.min(idx, S.openTabs.length - 1);
+    openNote(S.openTabs[S.activeTabIdx].id);
+  }
+  renderTabs();
+}
+
+/* ── Dashboard ── */
+async function loadDashboard() {
+  try {
+    const d = await api('GET', '/api/v1/dashboard');
+    const tasks = d.open_tasks || [];
+    $('dashTasks').innerHTML = tasks.length
+      ? tasks.map(t => `<div class="dash-item">☐ ${esc(t.text || '')}
+          <div class="m">${esc(t.list_title || '')}${t.due_date ? ' · até ' + esc(t.due_date) : ''}${t.progress_count ? ' · ' + t.progress_count + ' and.' : ''}</div></div>`).join('')
+      : '<div class="status">Nenhuma tarefa em aberto</div>';
+    const evs = d.events || [];
+    $('dashEvents').innerHTML = evs.length
+      ? evs.map(e => `<div class="dash-item">📅 ${esc(e.title || '')}
+          <div class="m">${esc((e.due_at || e.remind_at || '').slice(0, 19))}</div></div>`).join('')
+      : '<div class="status">Nenhum evento</div>';
+    const recent = (S.notes || []).slice(0, 12);
+    if (!recent.length) await loadNotes();
+    const rec = (S.notes || []).slice(0, 12);
+    $('dashRecent').innerHTML = rec.map(n =>
+      `<div class="item" onclick="openNoteFromHome('${n.entity_id}')">
+        <div class="title">${kindIcon(n)}${esc(n.title || '(sem título)')}</div>
+        <div class="meta">${esc((n.updated_at || '').slice(0, 19))} · ${esc(n.kind || 'note')}</div>
+      </div>`).join('') || '<div class="status">Sem notas</div>';
+    $('homeInfo').textContent = `${S.notes.length} notas · mesmos dados do desktop · localhost`;
+  } catch (e) { setStatus(e.message, false); }
+}
+function kindIcon(n) { const k = n.kind || 'note'; if (k === 'tasklist') return '☑ '; if (k === 'agent_task') return '🤖 '; return ''; }
+
+/* ── Notes ── */
+async function loadNotes() {
+  try {
+    const q = $('q').value.trim();
+    const qs = q ? ('?q=' + encodeURIComponent(q)) : '';
+    const data = await api('GET', '/api/v1/notes' + qs);
+    S.notes = data.notes || [];
+    const list = $('noteList');
+    list.innerHTML = '';
+    S.notes.forEach(n => {
+      const div = document.createElement('div');
+      div.className = 'item' + (S.current === n.entity_id ? ' active' : '');
+      const markers = (n.markers || []).slice(0, 4).join(' ');
+      div.innerHTML = `<div class="title">${kindIcon(n)}${esc(n.title || '(sem título)')}</div>
+        <div class="meta">${esc((n.updated_at || '').slice(0, 19))} · ${esc(n.kind || 'note')} ${esc(markers)}</div>`;
+      div.onclick = () => openNoteTabbed(n.entity_id);
+      list.appendChild(div);
+    });
+    setStatus(S.notes.length + ' notas', true);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+function openNoteFromHome(id) { setView('notes'); openNoteTabbed(id); }
+
+async function openNoteTabbed(id) {
+  try {
+    const data = await api('GET', '/api/v1/notes/' + id);
+    const n = data.note;
+    addTab(id, n.title || '', n.kind || 'note');
+    if (!S._navInProgress) {
+      S.agentNavStack = [];
+      hideAgentNav();
+    }
+    S._navInProgress = false;
+    await openNote(id);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+async function openNote(id) {
+  try {
+    setView('notes');
+    const data = await api('GET', '/api/v1/notes/' + id);
+    const n = data.note;
+    S.current = id;
+    $('title').value = n.title || '';
+    $('markers').value = (n.markers || []).join(' ');
+    const kind = n.kind || 'note';
+    const isAgent = kind === 'agent_task';
+    $('bodyHtml').style.display = isAgent ? 'none' : '';
+    $('agentEditorOverlay').style.display = isAgent ? 'flex' : 'none';
+    if (!isAgent) {
+      const body = n.body || '';
+      if (body.trim().startsWith('<')) $('bodyHtml').innerHTML = body;
+      else $('bodyHtml').innerText = body;
+    } else {
+      await loadAgentEditor(id, n);
+    }
+    $('meta').textContent = `${kind} · id ${id.slice(0, 12)}… · host ${n.updated_by_host || '?'}`;
+    $('sideMeta').innerHTML = `
+      <div>Criada: ${esc((n.created_at || '—').slice(0, 19))}</div>
+      <div>Atualizada: ${esc((n.updated_at || '—').slice(0, 19))}</div>
+      <div>Host: ${esc(n.updated_by_host || '?')}</div>
+      <div>Tipo: ${esc(kind)}</div>
+      <div>Marcadores: ${esc((n.markers || []).join(' ') || '—')}</div>`;
+    const hist = await api('GET', '/api/v1/notes/' + id + '/history');
+    const box = $('sideHist');
+    box.innerHTML = '';
+    (hist.history || []).slice().reverse().slice(0, 40).forEach(b => {
+      const d = document.createElement('div');
+      d.className = 'hist';
+      const g = b.group_size > 1 ? ` ×${b.group_size}` : '';
+      d.textContent = `${(b.timestamp || '').slice(0, 19)} · ${b.action || ''}${g}`;
+      d.onclick = () => revertTo(b.block_hash);
+      box.appendChild(d);
+    });
+    await loadNotes();
+  } catch (e) { setStatus(e.message, false); }
+}
+
+/* ── Agent Editor ── */
+async function loadAgentEditor(id, n) {
+  try {
+    const data = await api('GET', '/api/v1/agent-tasks/' + id);
+    const t = data.task;
+    $('agAgent').innerHTML = ['grok','gemini','opencode-deepseek4'].map(a =>
+      `<option value="${a}"${a === t.agent ? ' selected' : ''}>${a}</option>`).join('');
+    $('agStatus').innerHTML = ['pending','running','done','failed','skipped'].map(s =>
+      `<option value="${s}"${s === t.status ? ' selected' : ''}>${s}</option>`).join('');
+    $('agDesc').value = t.description || '';
+    $('agOutput').textContent = t.output || '';
+    document.getElementById('agPlay').style.display = 'inline-block';
+    document.getElementById('agCancel').style.display = 'none';
+    hideAgentStatus();
+    await loadSubtasks(id);
+  } catch (e) { console.error(e); }
+}
+
+async function loadSubtasks(noteId) {
+  try {
+    const data = await apiNoThrow('GET', `/api/v1/agent-tasks/${noteId}/children`);
+    const children = (data && data.children) || [];
+    const el = $('agSubtasks');
+    el.innerHTML = '';
+    const colors = { 'done': '#9ece6a', 'failed': '#f7768e', 'running': '#e0af68', 'pending': '#565f89' };
+    const icons = { 'done': '✓', 'failed': '✗', 'running': '●', 'pending': '○' };
+    children.forEach(c => {
+      const st = c.status || 'pending';
+      const div = document.createElement('div');
+      div.className = 'subtask-row';
+      div.innerHTML = `<span style="color:${colors[st]||'#565f89'}">${icons[st]||'○'}</span>
+        ${esc(c.title || 'Sem título')} <span class="st-meta">${esc(c.agent||'')}</span>`;
+      div.onclick = () => navToChild(c.entity_id);
+      el.appendChild(div);
+    });
+    if (!children.length && !S.agentNavStack.length) {
+      showInlineForm();
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function navToChild(childId) {
+  saveCurrentAgentState();
+  S.agentNavStack.push({
+    id: S.current,
+    body: $('agDesc').value,
+    output: $('agOutput').textContent,
+    children: []
+  });
+  S._navInProgress = true;
+  await openNoteTabbed(childId);
+  showAgentNav('Subtarefa');
+}
+
+async function navBack() {
+  if (!S.agentNavStack.length) return;
+  saveCurrentAgentState();
+  const prev = S.agentNavStack.pop();
+  S._navInProgress = true;
+  await openNoteTabbed(prev.id);
+  if (!S.agentNavStack.length) hideAgentNav();
+}
+
+function showAgentNav(title) {
+  $('agNavBar').classList.add('on');
+  $('agNavTitle').textContent = title || '';
+}
+function hideAgentNav() {
+  $('agNavBar').classList.remove('on');
+}
+
+function saveCurrentAgentState() {
+  // Will be saved by scheduleSave
+  scheduleSave();
+}
+
+/* ── Agent Execute ── */
+async function executeAgent() {
+  if (!S.current) return;
+  $('agPlay').style.display = 'none';
+  $('agCancel').style.display = 'inline-block';
+  $('agOutput').textContent = '';
+  setAgentStatus('🤖 Executando agente... [0s]', '#e0af68');
+  S.agentStartTime = Date.now();
+  S.agentTimerId = setInterval(tickAgentTimer, 1000);
+
+  // Poll for output
+  S.agentPolling = setInterval(async () => {
+    try {
+      const data = await api('GET', `/api/v1/agent-tasks/${S.current}`);
+      if (data && data.task) {
+        $('agOutput').textContent = data.task.output || '';
+        if (data.task.status !== 'running') {
+          stopAgentPolling();
+          onAgentDone(data.task);
+        }
+      }
+    } catch (_) {}
+  }, 1000);
+
+  // Start execution (blocks server-side)
+  try {
+    const result = await api('POST', `/api/v1/agent-tasks/${S.current}/run`, {});
+    // If returned (not via polling done), stop polling
+    stopAgentPolling();
+    $('agPlay').style.display = 'inline-block';
+    $('agCancel').style.display = 'none';
+    if (result.ok) {
+      setAgentStatus('✓ Agente concluído', '#9ece6a');
+      setTimeout(hideAgentStatus, 6000);
+      // Reload output
+      const data = await api('GET', `/api/v1/agent-tasks/${S.current}`);
+      $('agOutput').textContent = (data.task && data.task.output) || '';
+    } else {
+      setAgentStatus('✗ Agente falhou', '#f7768e');
+      setTimeout(hideAgentStatus, 6000);
+    }
+  } catch (e) {
+    stopAgentPolling();
+    $('agPlay').style.display = 'inline-block';
+    $('agCancel').style.display = 'none';
+    setAgentStatus('✗ Erro: ' + esc(e.message), '#f7768e');
+    setTimeout(hideAgentStatus, 6000);
+  }
+}
+
+async function cancelAgent() {
+  if (!S.current) return;
+  try { await api('POST', `/api/v1/agent-tasks/${S.current}/cancel`, {}); } catch (_) {}
+  stopAgentPolling();
+  clearInterval(S.agentTimerId);
+  $('agPlay').style.display = 'inline-block';
+  $('agCancel').style.display = 'none';
+  setAgentStatus('✗ Cancelado', '#f7768e');
+  setTimeout(hideAgentStatus, 6000);
+}
+
+function onAgentDone(task) {
+  clearInterval(S.agentTimerId);
+  $('agPlay').style.display = 'inline-block';
+  $('agCancel').style.display = 'none';
+  $('agStatus').value = task.status || 'done';
+  if (task.status === 'done') { setAgentStatus('✓ Agente concluído', '#9ece6a'); }
+  else { setAgentStatus('✗ Agente: ' + esc(task.status || 'falha'), '#f7768e'); }
+  setTimeout(hideAgentStatus, 6000);
+  scheduleSave();
+}
+
+function stopAgentPolling() {
+  if (S.agentPolling) { clearInterval(S.agentPolling); S.agentPolling = null; }
+  if (S.agentTimerId) { clearInterval(S.agentTimerId); S.agentTimerId = null; }
+}
+
+function tickAgentTimer() {
+  const elapsed = Math.floor((Date.now() - S.agentStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  const ts = m ? `${m}m${String(s).padStart(2, '0')}s` : `${s}s`;
+  setAgentStatus(`🤖 Executando agente... [${ts}]`, '#e0af68');
+}
+
+function setAgentStatus(text, color) {
+  const el = $('agStatusFooter');
+  el.textContent = text;
+  el.style.color = color;
+  el.classList.add('on');
+}
+function hideAgentStatus() { $('agStatusFooter').classList.remove('on'); }
+
+function clearAgentOutput() {
+  $('agOutput').textContent = '';
+  scheduleSave();
+}
+
+function showInlineForm() {
+  var el = $('agInlineForm');
+  if (el) { el.classList.add('on'); }
+  $('agSubTitle').value = '';
+  $('agSubDesc').value = '';
+  $('agSubTitle').focus();
+}
+function hideInlineForm() {
+  var el = $('agInlineForm');
+  if (el) { el.classList.remove('on'); }
+}
+
+async function addSubtask() {
+  const title = $('agSubTitle').value.trim();
+  if (!title) return;
+  const desc = $('agSubDesc').value.trim() || title;
+  const agent = $('agAgent').value || 'grok';
+  try {
+    await api('POST', `/api/v1/agent-tasks/${S.current}/add-related`, { title, description: desc, agent });
+    hideInlineForm();
+    await loadSubtasks(S.current);
+    await loadNotes();
+  } catch (e) { setStatus(e.message, false); }
+}
+
+function markersArr() {
+  return $('markers').value.split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+}
+
+async function saveNote() {
+  if (!S.current) return newNote();
+  const tab = S.openTabs.find(t => t.id === S.current);
+  const isAgent = tab && tab.kind === 'agent_task';
+  try {
+    const payload = {
+      title: $('title').value,
+      body: isAgent ? buildAgentBody() : $('bodyHtml').innerHTML,
+      markers: markersArr(),
+    };
+    if (isAgent) {
+      payload.agent = $('agAgent').value || 'grok';
+      payload.agent_status = $('agStatus').value || 'pending';
+    }
+    await api('PUT', '/api/v1/notes/' + S.current, payload);
+    setStatus('Salvo', true);
+    await loadNotes();
+  } catch (e) { setStatus(e.message, false); }
+}
+
+function buildAgentBody() {
+  const cur = {
+    version: 1,
+    description: $('agDesc').value || '',
+    agent: $('agAgent').value || 'grok',
+    status: $('agStatus').value || 'pending',
+    output: $('agOutput').textContent || '',
+    executed_at: null,
+    parent_id: null,
+    related_ids: [],
+  };
+  return JSON.stringify(cur, null, 2);
+}
+
+function scheduleSave() {
+  if (!S.current) return;
+  clearTimeout(S.saveTimer);
+  S.saveTimer = setTimeout(() => saveNote().catch(() => {}), 1000);
+}
+
+async function newNote() {
+  try {
+    const data = await api('POST', '/api/v1/notes', {
+      title: 'Nova nota', body: '<h1>Título</h1><p></p>', kind: 'note',
+    });
+    await loadNotes();
+    await openNoteTabbed(data.note.entity_id);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+async function newTasklist() {
+  try {
+    const data = await api('POST', '/api/v1/tasklists', { title: 'Lista de tarefas' });
+    await loadNotes();
+    await openNoteTabbed(data.note.entity_id);
+    setView('tasks'); await loadTasksView();
+  } catch (e) { setStatus(e.message, false); }
+}
+
+async function newAgent() {
+  try {
+    const title = ($('agNewTitle').value || 'Tarefa para agente');
+    const data = await api('POST', '/api/v1/agent-tasks', {
+      title: title,
+      description: $('agNewDesc').value || 'Descreva a tarefa…',
+      agent: $('agNewAgent').value || 'grok',
+    });
+    $('agNewTitle').value = '';
+    $('agNewDesc').value = '';
+    await loadAgents();
+    await openNoteTabbed(data.note.entity_id);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+async function deleteNote() {
+  if (!S.current || !confirm('Excluir esta nota?')) return;
+  try {
+    await api('DELETE', '/api/v1/notes/' + S.current);
+    const idx = findTabIdx(S.current);
+    if (idx >= 0) closeTab(idx);
+    else { S.current = null; $('title').value = ''; $('markers').value = ''; $('bodyHtml').innerHTML = ''; }
+    $('sideMeta').textContent = 'Selecione uma nota';
+    $('sideHist').innerHTML = '';
+    await loadNotes();
+    setStatus('Excluída', true);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+async function revertTo(hash) {
+  if (!S.current || !hash) return;
+  if (!confirm('Reverter para esta versão?')) return;
+  try {
+    await api('POST', '/api/v1/notes/' + S.current + '/revert', { block_hash: hash });
+    await openNote(S.current);
+    setStatus('Revertido', true);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+/* ── Tasks ── */
+async function loadTasksView() {
+  try {
+    const data = await api('GET', '/api/v1/notes');
+    const lists = (data.notes || []).filter(n => n.kind === 'tasklist');
+    $('taskLists').innerHTML = lists.length
+      ? lists.map(n => `<div class="item" onclick="openNoteTabbed('${n.entity_id}')">
+          <div class="title">☑ ${esc(n.title || '')}</div>
+          <div class="meta">${esc((n.updated_at || '').slice(0, 19))} · abertos: ${n.task_open_count ?? '?'}</div>
+        </div>`).join('')
+      : '<div class="status">Nenhuma lista — crie uma nova</div>';
+    const dash = await api('GET', '/api/v1/dashboard');
+    const open = dash.open_tasks || [];
+    $('taskOpen').innerHTML = open.length
+      ? open.map(t => `<div class="dash-item">☐ ${esc(t.text || '')}
+          <div class="m">${esc(t.list_title || '')}${t.due_date ? ' · até ' + esc(t.due_date) : ''}</div></div>`).join('')
+      : '<div class="status">Nada em aberto</div>';
+  } catch (e) { setStatus(e.message, false); }
+}
+
+/* ── Events ── */
+async function loadEvents() {
+  try {
+    const d = await api('GET', '/api/v1/events');
+    $('evList').innerHTML = (d.events || []).length
+      ? d.events.map(e => `<div class="item">
+          <div class="title">📅 ${esc(e.title || '')}</div>
+          <div class="meta">${esc((e.due_at || e.remind_at || '').slice(0, 19))}</div>
+        </div>`).join('')
+      : '<div class="status">Sem eventos</div>';
+  } catch (e) { setStatus(e.message, false); }
+}
+async function addEvent() {
+  try {
+    await api('POST', '/api/v1/events', {
+      title: $('evTitle').value || 'Evento',
+      due_at: $('evWhen').value || null, remind_at: $('evWhen').value || null,
+    });
+    $('evTitle').value = '';
+    await loadEvents(); await loadDashboard();
+    setStatus('Evento criado', true);
+  } catch (e) { setStatus(e.message, false); }
+}
+
+/* ── Agents list ── */
+function parseAgentMeta(n) {
+  let agent = n.agent || '';
+  let status = n.agent_status || '';
+  if (!agent || !status) {
+    try {
+      const body = JSON.parse(n.body || '{}');
+      if (!agent) agent = body.agent || '';
+      if (!status) status = body.status || '';
+    } catch (_) {}
+  }
+  return { agent: agent || '?', status: status || '?' };
+}
+
+async function loadAgents() {
+  try {
+    const data = await api('GET', '/api/v1/notes');
+    const agents = (data.notes || []).filter(n => n.kind === 'agent_task');
+    $('agList').innerHTML = agents.length
+      ? agents.map(n => {
+          const meta = parseAgentMeta(n);
+          return `<div class="item" onclick="openNoteTabbed('${n.entity_id}')">
+            <div class="title">🤖 [${esc(meta.status)}] ${esc(meta.agent)}: ${esc(n.title || '')}</div>
+            <div class="meta">${esc((n.updated_at || '').slice(0, 19))}</div>
+          </div>`;
+        }).join('')
+      : '<div class="status">Nenhuma tarefa de agente</div>';
+  } catch (e) { setStatus(e.message, false); }
+}
+
+/* ── Wire UI ── */
+$('loginBtn').onclick = doLogin;
+$('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+$('logoutBtn').onclick = logout;
+$('searchBtn').onclick = loadNotes;
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') loadNotes(); });
+$('newNoteBtn').onclick = newNote;
+$('newTaskBtn').onclick = newTasklist;
+$('newAgentBtn').onclick = () => { setView('agents'); };
+$('saveBtn').onclick = saveNote;
+$('delBtn').onclick = deleteNote;
+$('evAdd').onclick = addEvent;
+$('agAdd').onclick = newAgent;
+$('taskNewList').onclick = newTasklist;
+$('homeNewNote').onclick = () => { setView('notes'); newNote(); };
+$('homeNewTask').onclick = newTasklist;
+$('homeNewAgent').onclick = () => setView('agents');
+$('homeEvents').onclick = () => setView('events');
+$('homeNotes').onclick = () => setView('notes');
+$('agPlay').onclick = executeAgent;
+$('agCancel').onclick = cancelAgent;
+$('agClearOutput').onclick = clearAgentOutput;
+$('agAddSubtask').onclick = function() { showInlineForm(); };
+$('agSubAdd').onclick = addSubtask;
+$('agSubCancel').onclick = hideInlineForm;
+$('agNavBack').onclick = function() { navBack(); };
+document.querySelectorAll('.nav button').forEach(b => {
+  b.onclick = () => setView(b.dataset.view);
+});
+document.querySelectorAll('.fmt button').forEach(b => {
+  b.addEventListener('click', () => {
+    const cmd = b.dataset.cmd;
+    const val = b.dataset.val;
+    document.execCommand(cmd, false, val || null);
+    $('bodyHtml').focus();
+    scheduleSave();
+  });
+});
+$('title').addEventListener('input', scheduleSave);
+$('markers').addEventListener('input', scheduleSave);
+$('bodyHtml').addEventListener('input', scheduleSave);
+$('agDesc')?.addEventListener('input', scheduleSave);
+$('agAgent')?.addEventListener('change', scheduleSave);
+$('agStatus')?.addEventListener('change', scheduleSave);
+
+(async () => {
+  await loadIdentities();
+  const ok = await tryRestore();
+  if (!ok) {
+    $('login').classList.remove('hidden');
+    $('app').classList.remove('on');
+  }
+})();
+</script>
+</body>
+</html>

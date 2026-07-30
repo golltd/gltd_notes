@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Auto-bump version before each commit
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+"$ROOT/scripts/bump_version.sh" > /dev/null
+git add "$ROOT/gltd_notes/_version.py" "$ROOT/pyproject.toml"
