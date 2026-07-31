@@ -717,7 +717,6 @@ class MainWindow(Gtk.Window):
         # id, title, updated, kind, favorite
         self.store = Gtk.ListStore(str, str, str, str, bool)
         self.tree = Gtk.TreeView(model=self.store)
-        self.tree.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         for i, key in enumerate(("col_title", "col_updated")):
             r = Gtk.CellRendererText()
             col = Gtk.TreeViewColumn(t(key), r, text=i + 1)
