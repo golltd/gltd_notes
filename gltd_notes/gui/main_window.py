@@ -1502,11 +1502,6 @@ class MainWindow(Gtk.Window):
         tab_label_box.pack_start(close_btn, False, False, 0)
         tab_label_box.show_all()
 
-        eb = Gtk.EventBox()
-        eb.add(tab_label_box)
-        eb.connect("button-press-event", self._on_tab_button_press)
-        eb.show()
-
         page = Gtk.Box()
         page._note_id = note_id
         page._note_kind = kind
@@ -1514,7 +1509,7 @@ class MainWindow(Gtk.Window):
         page._note_fav = is_fav
         page.show()
 
-        self.notebook.append_page(page, eb)
+        self.notebook.append_page(page, tab_label_box)
         self.notebook.set_show_tabs(True)
         self._open_tabs[note_id] = {"title": note_title, "kind": kind}
 
@@ -1526,7 +1521,7 @@ class MainWindow(Gtk.Window):
     def _on_tab_close_clicked(self, button: Gtk.Button) -> None:
         for i in range(self.notebook.get_n_pages()):
             tab = self.notebook.get_tab_label(self.notebook.get_nth_page(i))
-            if tab is not None and (button is tab or button.is_ancestor(tab)):
+            if tab is not None and (button is tab or tab.is_ancestor(button)):
                 self._close_tab(i)
                 return
 
@@ -1700,22 +1695,14 @@ class MainWindow(Gtk.Window):
     def _on_select(self, selection) -> None:
         if self._ui_locked or self._loading_note or self._refreshing_notes:
             return
-        try:
-            rows = selection.get_selected_rows()
-            if not rows or not rows[1]:
-                return
-            if len(rows[1]) > 1:
-                return
-            it = rows[0].get_iter(rows[1][0])
-        except Exception:
-            model, it = selection.get_selected()
-            if not it:
-                return
-        note_id = it[0]
+        model, it = selection.get_selected()
+        if not it:
+            return
+        note_id = model[it][0]
         if note_id == self._current_note_id:
             return
-        title = it[1] or ""
-        kind = it[3] or "note"
+        title = model[it][1] or ""
+        kind = model[it][3] or "note"
         self._open_note_in_tab(note_id, title, kind)
 
     def _tree_cell_data(self, _col, renderer, model, it, _data) -> None:
