@@ -432,11 +432,11 @@ class MainWindow(Gtk.Window):
     def _setup_paned_positions(self) -> None:
         def _set_positions():
             if hasattr(self, "_main_paned"):
-                self._main_paned.set_position(230)
+                self._main_paned.set_position(220)
             if hasattr(self, "_editor_paned"):
                 width = self.get_allocated_width()
-                side_w = 210 if width > 900 else 170
-                target = max(300, width - side_w - 60)
+                side_w = 180 if width > 1000 else 150
+                target = max(320, width - side_w - 260)
                 self._editor_paned.set_position(target)
             return False
         GLib.idle_add(_set_positions)
@@ -717,6 +717,7 @@ class MainWindow(Gtk.Window):
         # id, title, updated, kind, favorite
         self.store = Gtk.ListStore(str, str, str, str, bool)
         self.tree = Gtk.TreeView(model=self.store)
+        self.tree.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
         for i, key in enumerate(("col_title", "col_updated")):
             r = Gtk.CellRendererText()
             col = Gtk.TreeViewColumn(t(key), r, text=i + 1)
@@ -823,6 +824,14 @@ class MainWindow(Gtk.Window):
         hist_btn.connect("clicked", lambda *_: self._history_dialog())
         right.pack_start(hist_btn, False, False, 0)
         self._hist_btn = hist_btn
+
+        self._side_toggle_btn = Gtk.Button()
+        self._side_toggle_btn.set_image(Gtk.Image.new_from_icon_name("go-previous", Gtk.IconSize.BUTTON))
+        self._side_toggle_btn.set_tooltip_text("Mostrar/Ocultar detalhes")
+        self._side_toggle_btn.set_always_show_image(True)
+        self._side_toggle_btn.connect("clicked", lambda *_: self._toggle_side_panel())
+        self._side_toggle_btn.hide()
+        right.pack_start(self._side_toggle_btn, False, False, 0)
 
         # ── Side panel: created + versions ──
         side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
@@ -1426,6 +1435,18 @@ class MainWindow(Gtk.Window):
         self.meta_label.set_visible(visible)
         self._side_panel.set_visible(visible)
         self._hist_btn.set_visible(visible)
+        if hasattr(self, "_side_toggle_btn"):
+            self._side_toggle_btn.set_visible(visible)
+
+    def _toggle_side_panel(self) -> None:
+        visible = not self._side_panel.get_visible()
+        self._side_panel.set_visible(visible)
+        if visible:
+            self._side_toggle_btn.set_tooltip_text("Ocultar detalhes")
+            self._side_toggle_btn.set_image(Gtk.Image.new_from_icon_name("go-previous", Gtk.IconSize.BUTTON))
+        else:
+            self._side_toggle_btn.set_tooltip_text("Mostrar detalhes")
+            self._side_toggle_btn.set_image(Gtk.Image.new_from_icon_name("go-next", Gtk.IconSize.BUTTON))
 
     # ── tabs ─────────────────────────────────────────────────
     def _active_tab_note_id(self) -> Optional[str]:
@@ -1679,14 +1700,17 @@ class MainWindow(Gtk.Window):
     def _on_select(self, selection) -> None:
         if self._ui_locked or self._loading_note or self._refreshing_notes:
             return
-        model, it = selection.get_selected()
-        if not it:
+        rows = selection.get_selected_rows()
+        if not rows or not rows[1]:
             return
-        note_id = model[it][0]
+        if len(rows[1]) > 1:
+            return
+        it = rows[0].get_iter(rows[1][0])
+        note_id = it[0]
         if note_id == self._current_note_id:
             return
-        title = model[it][1] or ""
-        kind = model[it][3] or "note"
+        title = it[1] or ""
+        kind = it[3] or "note"
         self._open_note_in_tab(note_id, title, kind)
 
     def _tree_cell_data(self, _col, renderer, model, it, _data) -> None:
@@ -1704,34 +1728,46 @@ class MainWindow(Gtk.Window):
         path_info = tree.get_path_at_pos(int(event.x), int(event.y))
         if path_info:
             path, _col, _cx, _cy = path_info
-            tree.get_selection().select_path(path)
-            model = tree.get_model()
-            it = model.get_iter(path)
-            note_id = model[it][0]
-            self._context_tree_note_id = note_id
-            fav = model[it][4]
-            self._tree_context_menu.get_children()[0].set_visible(not fav)
-            self._tree_context_menu.get_children()[1].set_visible(fav)
+            sel = tree.get_selection()
+            if not sel.path_is_selected(path):
+                sel.unselect_all()
+                sel.select_path(path)
+            self._context_tree_note_ids = self._get_selected_note_ids()
+            has_fav = any(self.store[sel.get_selected_rows()[0].get_iter(p)][4] for p in sel.get_selected_rows()[1])
+            all_fav = all(self.store[sel.get_selected_rows()[0].get_iter(p)][4] for p in sel.get_selected_rows()[1])
+            self._tree_context_menu.get_children()[0].set_visible(not all_fav)
+            self._tree_context_menu.get_children()[1].set_visible(has_fav)
             self._tree_context_menu.popup_at_pointer(event)
             return True
         return False
 
+    def _get_selected_note_ids(self) -> list:
+        sel = self.tree.get_selection()
+        model, paths = sel.get_selected_rows()
+        if not paths:
+            return []
+        return [model[model.get_iter(p)][0] for p in paths]
+
     def _toggle_tree_favorite(self, fav: bool) -> None:
-        if hasattr(self, "_context_tree_note_id") and self._context_tree_note_id:
-            self._toggle_favorite(self._context_tree_note_id, fav)
+        note_ids = getattr(self, "_context_tree_note_ids", [])
+        for nid in note_ids:
+            self._toggle_favorite(nid, fav)
 
     def _tree_context_delete(self) -> None:
-        note_id = getattr(self, "_context_tree_note_id", None)
-        if not note_id:
+        note_ids = getattr(self, "_context_tree_note_ids", [])
+        if not note_ids:
             return
+        n = len(note_ids)
+        label = f"Excluir {n} nota(s)?" if n > 1 else t("delete") + "?"
         dialog = Gtk.MessageDialog(
             transient_for=self,
             message_type=Gtk.MessageType.QUESTION,
             buttons=Gtk.ButtonsType.OK_CANCEL,
-            text=t("delete") + "?",
+            text=label,
         )
         if dialog.run() == Gtk.ResponseType.OK:
-            self._delete_note(note_id)
+            for nid in note_ids:
+                self._delete_note(nid)
         dialog.destroy()
 
     def _on_side_fav_clicked(self) -> None:
