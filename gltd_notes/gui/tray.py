@@ -70,6 +70,7 @@ class TrayIcon:
                 )
 
             indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+            indicator.set_title("GLTD Notes")
             menu = Gtk.Menu()
 
             def add_item(label: str, cb: Optional[Callable[[], None]]) -> None:
