@@ -315,6 +315,7 @@ class MainWindow(Gtk.Window):
         self.connect("destroy", self._on_destroy)
 
         self._build_ui()
+        self._setup_paned_positions()
         self._setup_theme()
         self._set_editor_chrome_visible(False)
         self._update_lock_ui()
@@ -427,6 +428,19 @@ class MainWindow(Gtk.Window):
         else:
             self._css_provider.load_from_data(b"")
         self.html_editor._apply_editor_theme(theme)
+
+    def _setup_paned_positions(self) -> None:
+        def _set_positions():
+            if hasattr(self, "_main_paned"):
+                self._main_paned.set_position(230)
+            if hasattr(self, "_editor_paned"):
+                width = self.get_allocated_width()
+                side_w = 210 if width > 900 else 170
+                target = max(300, width - side_w - 60)
+                self._editor_paned.set_position(target)
+            return False
+        GLib.idle_add(_set_positions)
+
     def _tool_button(self, icon_name: str, label: str, cb) -> Gtk.ToolButton:
         img = icon_image(icon_name, 24)
         btn = Gtk.ToolButton.new(img, label)
@@ -695,10 +709,11 @@ class MainWindow(Gtk.Window):
         self._ws_kind_header.pack_start(self._ws_new_btn, False, False, 0)
 
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self._main_paned = paned
         workspace.pack_start(paned, True, True, 0)
 
         scroll_list = Gtk.ScrolledWindow()
-        scroll_list.set_size_request(280, -1)
+        scroll_list.set_size_request(200, -1)
         # id, title, updated, kind, favorite
         self.store = Gtk.ListStore(str, str, str, str, bool)
         self.tree = Gtk.TreeView(model=self.store)
@@ -729,6 +744,7 @@ class MainWindow(Gtk.Window):
 
         # center editor + right meta/history
         center_right = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self._editor_paned = center_right
         paned.add2(center_right)
 
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin=6)
@@ -810,7 +826,7 @@ class MainWindow(Gtk.Window):
 
         # ── Side panel: created + versions ──
         side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=6)
-        side.set_size_request(240, -1)
+        side.set_size_request(180, -1)
         center_right.pack2(side, False, True)
         side.pack_start(Gtk.Label(label="<b>Detalhes</b>", use_markup=True, xalign=0), False, False, 0)
         self._side_created = Gtk.Label(label="Criada: —", xalign=0)
