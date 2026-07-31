@@ -1700,12 +1700,17 @@ class MainWindow(Gtk.Window):
     def _on_select(self, selection) -> None:
         if self._ui_locked or self._loading_note or self._refreshing_notes:
             return
-        rows = selection.get_selected_rows()
-        if not rows or not rows[1]:
-            return
-        if len(rows[1]) > 1:
-            return
-        it = rows[0].get_iter(rows[1][0])
+        try:
+            rows = selection.get_selected_rows()
+            if not rows or not rows[1]:
+                return
+            if len(rows[1]) > 1:
+                return
+            it = rows[0].get_iter(rows[1][0])
+        except Exception:
+            model, it = selection.get_selected()
+            if not it:
+                return
         note_id = it[0]
         if note_id == self._current_note_id:
             return
@@ -1733,8 +1738,17 @@ class MainWindow(Gtk.Window):
                 sel.unselect_all()
                 sel.select_path(path)
             self._context_tree_note_ids = self._get_selected_note_ids()
-            has_fav = any(self.store[sel.get_selected_rows()[0].get_iter(p)][4] for p in sel.get_selected_rows()[1])
-            all_fav = all(self.store[sel.get_selected_rows()[0].get_iter(p)][4] for p in sel.get_selected_rows()[1])
+            model = tree.get_model()
+            has_fav = False
+            all_fav = True
+            for nid in self._context_tree_note_ids:
+                for row in model:
+                    if row[0] == nid:
+                        if row[4]:
+                            has_fav = True
+                        else:
+                            all_fav = False
+                        break
             self._tree_context_menu.get_children()[0].set_visible(not all_fav)
             self._tree_context_menu.get_children()[1].set_visible(has_fav)
             self._tree_context_menu.popup_at_pointer(event)
@@ -1743,7 +1757,11 @@ class MainWindow(Gtk.Window):
 
     def _get_selected_note_ids(self) -> list:
         sel = self.tree.get_selection()
-        model, paths = sel.get_selected_rows()
+        try:
+            model, paths = sel.get_selected_rows()
+        except Exception:
+            model, it = sel.get_selected()
+            return [model[it][0]] if it else []
         if not paths:
             return []
         return [model[model.get_iter(p)][0] for p in paths]
