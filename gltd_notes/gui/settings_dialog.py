@@ -33,6 +33,7 @@ class SettingsDialog(Gtk.Dialog):
         self.get_content_area().pack_start(nb, True, True, 0)
 
         nb.append_page(self._page_interface(), Gtk.Label(label=t("interface")))
+        nb.append_page(self._page_sync(), Gtk.Label(label="Sync"))
         nb.append_page(self._page_security(), Gtk.Label(label=t("security")))
         nb.append_page(self._page_api(), Gtk.Label(label=t("api_web")))
         nb.append_page(self._page_paths(), Gtk.Label(label=t("paths")))
@@ -103,6 +104,67 @@ class SettingsDialog(Gtk.Dialog):
                 mw._apply_theme()
         self.iface_status.set_text(t("settings_saved"))
         self.emit("response", Gtk.ResponseType.APPLY)
+
+    def _page_sync(self) -> Gtk.Widget:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin=12)
+        sc = self.config.data.setdefault("syncthing", {})
+
+        box.pack_start(Gtk.Label(label="Modo de sincronizacao", xalign=0), False, False, 0)
+        self.sync_mode_combo = Gtk.ComboBoxText()
+        modes = [("none", "Nenhum"), ("embedded", "Syncthing embarcado"), ("external", "Syncthing externo")]
+        current = sc.get("mode", "none")
+        self._sync_mode_codes = []
+        active = 0
+        for i, (code, label) in enumerate(modes):
+            self.sync_mode_combo.append_text(label)
+            self._sync_mode_codes.append(code)
+            if code == current:
+                active = i
+        self.sync_mode_combo.set_active(active)
+        self.sync_mode_combo.connect("changed", lambda *_: self._update_sync_fields())
+        box.pack_start(self.sync_mode_combo, False, False, 0)
+
+        self._sync_external_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(self._sync_external_box, False, False, 0)
+
+        lbl = Gtk.Label(label="API URL (externo)", xalign=0)
+        self._sync_external_box.pack_start(lbl, False, False, 0)
+        self.sync_api_url = Gtk.Entry()
+        self.sync_api_url.set_text(sc.get("api_url", "http://127.0.0.1:8384"))
+        self.sync_api_url.set_placeholder_text("http://127.0.0.1:8384")
+        self._sync_external_box.pack_start(self.sync_api_url, False, False, 0)
+
+        lbl2 = Gtk.Label(label="API Key (externo)", xalign=0)
+        self._sync_external_box.pack_start(lbl2, False, False, 0)
+        self.sync_api_key = Gtk.Entry()
+        self.sync_api_key.set_text(sc.get("api_key", ""))
+        self.sync_api_key.set_visibility(False)
+        self._sync_external_box.pack_start(self.sync_api_key, False, False, 0)
+
+        self._update_sync_fields()
+
+        save = Gtk.Button(label=t("save_settings"))
+        save.connect("clicked", self._on_save_sync)
+        box.pack_start(save, False, False, 0)
+        self.sync_status = Gtk.Label(label="", xalign=0)
+        box.pack_start(self.sync_status, False, False, 0)
+        return box
+
+    def _update_sync_fields(self) -> None:
+        idx = self.sync_mode_combo.get_active()
+        mode = self._sync_mode_codes[idx] if 0 <= idx < len(self._sync_mode_codes) else "none"
+        self._sync_external_box.set_visible(mode == "external")
+
+    def _on_save_sync(self, *_args) -> None:
+        idx = self.sync_mode_combo.get_active()
+        mode = self._sync_mode_codes[idx] if 0 <= idx < len(self._sync_mode_codes) else "none"
+        sc = self.config.data.setdefault("syncthing", {})
+        sc["mode"] = mode
+        if mode == "external":
+            sc["api_url"] = self.sync_api_url.get_text()
+            sc["api_key"] = self.sync_api_key.get_text()
+        self.config.save()
+        self.sync_status.set_text(t("settings_saved"))
 
     def _page_security(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin=12)

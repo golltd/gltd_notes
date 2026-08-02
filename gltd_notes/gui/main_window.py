@@ -333,6 +333,7 @@ class MainWindow(Gtk.Window):
         self._refresh_notes()
         self._refresh_dashboard()
         self._refresh_home_filter_tags()
+        self._start_sync()
         GLib.timeout_add_seconds(
             int(config.data.get("notifications", {}).get("check_interval_seconds", 60)),
             self._poll_events,
@@ -941,6 +942,13 @@ class MainWindow(Gtk.Window):
         self.agent_status_label.set_margin_end(8)
         self.agent_status_label.hide()
         outer.pack_start(self.agent_status_label, False, False, 0)
+
+        self._sync_btn = Gtk.Button(label="  Sync: —  ")
+        self._sync_btn.set_relief(Gtk.ReliefStyle.NONE)
+        self._sync_btn.set_tooltip_text("Status de sincronizacao — clique para detalhes")
+        self._sync_btn.connect("clicked", lambda *_: self._show_sync_details())
+        self._sync_btn.hide()
+        outer.pack_start(self._sync_btn, False, False, 0)
 
         self.status = Gtk.Statusbar()
         self.status_ctx = self.status.get_context_id("main")
@@ -2884,6 +2892,27 @@ class MainWindow(Gtk.Window):
         xmr_qr.connect("clicked", lambda *_: self._show_qrcode("Monero", xmr_addr, d))
         xmr_actions.pack_start(xmr_qr, False, False, 0)
 
+        # ── Tab: Licencas ──
+        license_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, margin=12)
+        notebook.append_page(license_box, Gtk.Label(label="Licencas"))
+
+        license_text = (
+            "GLTD Notes — MIT License\n"
+            "Copyright (c) 2026 GLTD\n\n"
+            "Este software inclui Syncthing (https://syncthing.net/),\n"
+            "licenciado sob Mozilla Public License 2.0 (MPL-2.0).\n"
+            "Copyright (c) 2014-2025 The Syncthing Authors.\n\n"
+            "Texto completo da licenca MPL-2.0:\n"
+            "https://www.mozilla.org/en-US/MPL/2.0/\n\n"
+            "O codigo-fonte do Syncthing esta disponivel em:\n"
+            "https://github.com/syncthing/syncthing\n\n"
+            "GLTD Notes NAO modifica o binario do Syncthing.\n"
+            "Apenas o distribui e gerencia como componente independente."
+        )
+        license_lbl = Gtk.Label(label=license_text, xalign=0)
+        license_lbl.set_selectable(True)
+        license_box.pack_start(license_lbl, False, False, 0)
+
         d.show_all()
         d.run()
         d.destroy()
@@ -3034,6 +3063,45 @@ class MainWindow(Gtk.Window):
         scroll.add(tv)
         content.pack_start(scroll, True, True, 0)
         win.show_all()
+
+    # ── Sync / Syncthing ──────────────────────────────────────
+
+    def _start_sync(self) -> None:
+        from gltd_notes.services.syncthing_service import SyncthingService
+
+        self._sync_service = SyncthingService(self.config)
+        if self._sync_service._mode == "none":
+            return
+        self._sync_btn.show()
+        if self._sync_service._mode == "embedded":
+            self._sync_service.start()
+        GLib.timeout_add_seconds(15, self._update_sync_status)
+
+    def _update_sync_status(self) -> bool:
+        if not hasattr(self, "_sync_service"):
+            return False
+        try:
+            if not self._sync_service.is_running():
+                self._sync_btn.set_label("  Sync: offline  ")
+                return True
+            status = self._sync_service.get_folder_status()
+            state = status.get("state", "unknown")
+            if state == "idle":
+                self._sync_btn.set_label("  Sync: OK  ")
+            elif state in ("syncing", "scanning"):
+                comp = self._sync_service.get_completion()
+                pct = int(comp.get("completion", 0))
+                self._sync_btn.set_label(f"  Sync: {pct}%  ")
+            else:
+                self._sync_btn.set_label(f"  Sync: {state}  ")
+        except Exception:
+            self._sync_btn.set_label("  Sync: —  ")
+        return True
+
+    def _show_sync_details(self) -> None:
+        from gltd_notes.gui.sync_dialog import show_sync_dialog
+
+        show_sync_dialog(self, self._sync_service)
 
     # ── Web UI process control ───────────────────────────────
     def _web_status_text(self) -> str:
