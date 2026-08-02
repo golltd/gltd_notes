@@ -149,8 +149,7 @@ class SettingsDialog(Gtk.Dialog):
 
         lbl3 = Gtk.Label(label="Caminho do binario Syncthing", xalign=0)
         self._sync_embedded_box.pack_start(lbl3, False, False, 0)
-        import os
-        default_bin = os.path.expanduser("~/.local/share/gltd_notes/syncthing/syncthing")
+        default_bin = str(DEFAULT_INSTALL_ROOT / "ext_program" / "syncthing")
         self.sync_bin_path = Gtk.Entry()
         self.sync_bin_path.set_text(sc.get("bin_path", default_bin))
         self.sync_bin_path.set_placeholder_text(default_bin)
@@ -196,8 +195,8 @@ class SettingsDialog(Gtk.Dialog):
         try:
             import subprocess, os
             script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "download_syncthing.sh")
-            bin_dir = os.path.dirname(self.sync_bin_path.get_text()) or os.path.expanduser("~/.local/share/gltd_notes/syncthing")
-            r = subprocess.run(["bash", script, bin_dir], capture_output=True, text=True, timeout=120)
+            bin_dir = os.path.dirname(self.sync_bin_path.get_text()) or str(DEFAULT_INSTALL_ROOT / "ext_program")
+            r = subprocess.run(["pkexec", "bash", script, bin_dir], capture_output=True, text=True, timeout=120)
             if r.returncode == 0:
                 self._sync_dl_status.set_text("Syncthing instalado com sucesso!")
             else:
