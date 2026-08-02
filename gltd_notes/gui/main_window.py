@@ -3100,9 +3100,14 @@ class MainWindow(Gtk.Window):
         return True
 
     def _open_sync_dashboard(self) -> None:
-        from gltd_notes.gui.sync_dashboard import SyncDashboard
-
-        SyncDashboard.show(self, self.config, getattr(self, "_sync_service", None))
+        try:
+            from gltd_notes.gui.sync_dashboard import SyncDashboard
+            SyncDashboard.show(self, self.config, getattr(self, "_sync_service", None))
+        except Exception as e:
+            import logging
+            _log_sync = logging.getLogger("gltd_notes")
+            _log_sync.warning("Erro ao abrir dashboard Syncthing: %s", e)
+            self._msg(f"Erro ao abrir Syncthing:\n{e}")
 
     def _show_sync_details(self) -> None:
         self._open_sync_dashboard()

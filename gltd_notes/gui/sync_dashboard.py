@@ -23,9 +23,20 @@ class SyncDashboard(Gtk.Dialog):
 
     @classmethod
     def show(cls, parent: Gtk.Window, config: Config, sync_service: Optional[SyncthingService]) -> None:
-        dlg = cls(parent, config, sync_service)
-        dlg.run()
-        dlg.destroy()
+        try:
+            dlg = cls(parent, config, sync_service)
+            dlg.run()
+            dlg.destroy()
+        except Exception as e:
+            dlg = Gtk.MessageDialog(
+                transient_for=parent,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text="Erro ao abrir Syncthing",
+            )
+            dlg.format_secondary_text(str(e))
+            dlg.run()
+            dlg.destroy()
 
     def __init__(self, parent: Gtk.Window, config: Config, sync_service: Optional[SyncthingService]):
         super().__init__(
@@ -35,12 +46,18 @@ class SyncDashboard(Gtk.Dialog):
         )
         self.set_default_size(640, 520)
         self.config = config
-        self._sync = sync_service or self._make_service()
+        self._sync = sync_service
+        try:
+            if self._sync is None:
+                self._sync = self._make_service()
+        except Exception:
+            self._sync = None
         self._device_name = f"gltd_notes_{socket.gethostname()}"
         self._my_id = self._get_my_device_id()
 
         content = self.get_content_area()
         content.set_spacing(8)
+        content.set_margin(12)
         content.set_margin(12)
 
         # ── My device info ──
@@ -100,18 +117,20 @@ class SyncDashboard(Gtk.Dialog):
             return None
 
     def _get_my_device_id(self) -> str:
-        if not self._sync or not self._sync.is_running():
+        if self._sync is None or not self._sync.is_running():
             return "— Syncthing offline —"
         try:
             status = self._sync._api_get("system/status")
-            return status.get("myID", "—")
+            if status and status.get("myID"):
+                return status["myID"]
         except Exception:
             pass
         bin_path = self._sync._bin_path()
-        if bin_path.exists():
+        if bin_path and bin_path.exists():
             try:
                 r = subprocess.run([str(bin_path), "--device-id"], capture_output=True, text=True, timeout=5)
-                return r.stdout.strip().split("\n")[-1].strip()
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout.strip().split("\n")[-1].strip()
             except Exception:
                 pass
         return "—"
@@ -175,12 +194,11 @@ class SyncDashboard(Gtk.Dialog):
         return box
 
     def _refresh_network_devices(self) -> bool:
-        if not self._sync or not self._sync.is_running():
-            self._net_store.clear()
+        self._net_store.clear()
+        if self._sync is None or not self._sync.is_running():
             self._net_store.append(["— Syncthing offline —", "", ""])
             return True
         try:
-            self._net_store.clear()
             for d in self._sync.get_devices():
                 status = "Online" if d.get("connected") else "Offline"
                 self._net_store.append([d.get("name", d["deviceID"][:12]), d["deviceID"], status])
@@ -279,8 +297,8 @@ class SyncDashboard(Gtk.Dialog):
         return box
 
     def _refresh_friends(self) -> bool:
+        self._friend_store.clear()
         try:
-            self._friend_store.clear()
             uh = self.config.active_user_hash
             if not uh:
                 return True
