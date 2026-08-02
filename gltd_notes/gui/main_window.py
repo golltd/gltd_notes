@@ -1495,14 +1495,12 @@ class MainWindow(Gtk.Window):
         title_eb.connect("button-press-event", self._on_tab_button_press)
         tab_label_box.pack_start(title_eb, True, True, 0)
 
-        close_btn = Gtk.Button()
-        close_img = Gtk.Image.new_from_icon_name("window-close", Gtk.IconSize.BUTTON)
-        close_btn.set_image(close_img)
-        close_btn.set_relief(Gtk.ReliefStyle.NONE)
-        close_btn.set_focus_on_click(False)
-        close_btn.set_tooltip_text("Fechar aba")
-        close_btn.connect("clicked", self._on_tab_close_clicked)
-        tab_label_box.pack_start(close_btn, False, False, 0)
+        close_lbl = Gtk.Label(label=" ✕ ")
+        close_eb = Gtk.EventBox()
+        close_eb.set_tooltip_text("Fechar aba")
+        close_eb.add(close_lbl)
+        close_eb.connect("button-press-event", self._on_tab_close_press)
+        tab_label_box.pack_start(close_eb, False, False, 0)
         tab_label_box.show_all()
 
         page = Gtk.Box()
@@ -1521,12 +1519,15 @@ class MainWindow(Gtk.Window):
         self._tab_switching = False
         self._load_note(note_id)
 
-    def _on_tab_close_clicked(self, button: Gtk.Button) -> None:
+    def _on_tab_close_press(self, eb: Gtk.EventBox, event: Gdk.EventButton) -> bool:
+        if event.button != 1:
+            return False
         for i in range(self.notebook.get_n_pages()):
             tab = self.notebook.get_tab_label(self.notebook.get_nth_page(i))
-            if tab is not None and (button is tab or tab.is_ancestor(button)):
+            if tab is not None and tab.is_ancestor(eb):
                 self._close_tab(i)
-                return
+                return True
+        return False
 
     def _on_tab_button_press(self, widget: Gtk.Widget, event: Gdk.EventButton) -> bool:
         if event.type != Gdk.EventType.BUTTON_PRESS or event.button != 3:
