@@ -1489,7 +1489,11 @@ class MainWindow(Gtk.Window):
         self._set_tab_label_text(title_lbl, note_title, is_fav)
         title_lbl.set_ellipsize(Pango.EllipsizeMode.END)
         title_lbl.set_max_width_chars(28)
-        tab_label_box.pack_start(title_lbl, True, True, 0)
+
+        title_eb = Gtk.EventBox()
+        title_eb.add(title_lbl)
+        title_eb.connect("button-press-event", self._on_tab_button_press)
+        tab_label_box.pack_start(title_eb, True, True, 0)
 
         close_btn = Gtk.Button()
         close_img = Gtk.Image.new_from_icon_name("window-close", Gtk.IconSize.BUTTON)
@@ -1498,15 +1502,8 @@ class MainWindow(Gtk.Window):
         close_btn.set_focus_on_click(False)
         close_btn.set_tooltip_text("Fechar aba")
         close_btn.connect("clicked", self._on_tab_close_clicked)
-        close_btn.connect("button-press-event", lambda btn, ev: self._on_tab_close_clicked(btn) or True)
         tab_label_box.pack_start(close_btn, False, False, 0)
         tab_label_box.show_all()
-
-        eb = Gtk.EventBox()
-        eb.set_visible_window(True)
-        eb.add(tab_label_box)
-        eb.connect("button-press-event", self._on_tab_button_press)
-        eb.show_all()
 
         page = Gtk.Box()
         page._note_id = note_id
@@ -1515,7 +1512,7 @@ class MainWindow(Gtk.Window):
         page._note_fav = is_fav
         page.show()
 
-        self.notebook.append_page(page, eb)
+        self.notebook.append_page(page, tab_label_box)
         self.notebook.set_show_tabs(True)
         self._open_tabs[note_id] = {"title": note_title, "kind": kind}
 
