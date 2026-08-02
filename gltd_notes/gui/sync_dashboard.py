@@ -65,7 +65,11 @@ class SyncDashboard(Gtk.Dialog):
         # ── My device info ──
         my_frame = Gtk.Frame(label="Meu dispositivo")
         content.pack_start(my_frame, False, False, 0)
-        my_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin=8)
+        my_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        my_box.set_margin_top(8)
+        my_box.set_margin_bottom(8)
+        my_box.set_margin_start(8)
+        my_box.set_margin_end(8)
         my_frame.add(my_box)
 
         id_box = Gtk.Box(spacing=6)
@@ -95,7 +99,11 @@ class SyncDashboard(Gtk.Dialog):
         # ── Status + controle ──
         status_frame = Gtk.Frame(label="Status do Syncthing")
         content.pack_start(status_frame, False, False, 0)
-        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin=8)
+        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        status_box.set_margin_top(8)
+        status_box.set_margin_bottom(8)
+        status_box.set_margin_start(8)
+        status_box.set_margin_end(8)
         status_frame.add(status_box)
 
         self._status_lbl = Gtk.Label(xalign=0)
@@ -194,7 +202,11 @@ class SyncDashboard(Gtk.Dialog):
     # ── Network devices tab ─────────────────────────────────────
 
     def _build_network_devices_tab(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=8)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+        box.set_margin_start(8)
+        box.set_margin_end(8)
 
         self._net_store = Gtk.ListStore(str, str, str)
         tree = Gtk.TreeView(model=self._net_store)
@@ -257,6 +269,10 @@ class SyncDashboard(Gtk.Dialog):
             self._status_lbl.set_text("Estado: PARADO")
         else:
             self._status_lbl.set_text("Parada disponivel apenas no modo embarcado.")
+
+    def _refresh_network_devices(self) -> bool:
+        if not hasattr(self, "_net_store"):
+            return True
         self._net_store.clear()
         if self._sync is None or not self._sync.is_running():
             self._net_store.append(["— Syncthing offline —", "", ""])
@@ -308,7 +324,11 @@ class SyncDashboard(Gtk.Dialog):
     # ── Friends tab (partial sharing via @tags) ──────────────────
 
     def _build_friends_tab(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=8)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+        box.set_margin_start(8)
+        box.set_margin_end(8)
 
         add_box = Gtk.Box(spacing=6)
         box.pack_start(add_box, False, False, 0)
