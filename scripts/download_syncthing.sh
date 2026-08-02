@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Download Syncthing binary for GLTD Notes embedded sync
-# Usage: sudo ./scripts/download_syncthing.sh [install_dir]
+# Usage: ./scripts/download_syncthing.sh [install_dir]
 set -euo pipefail
 
-INSTALL_DIR="${1:-/var/PROGRAMAS/gltd_notes/ext_program}"
+INSTALL_DIR="${1:-$HOME/.local/share/gltd_notes/syncthing}"
 mkdir -p "$INSTALL_DIR"
 
 ARCH=$(uname -m)
