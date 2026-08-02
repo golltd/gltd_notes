@@ -227,9 +227,10 @@ class HtmlNoteEditor(Gtk.Box):
         self._editor_theme = "dark"
 
         # formatting toolbar
-        tb = Gtk.Box(spacing=4)
+        tb = Gtk.Box(spacing=2)
         tb.set_margin_top(2)
         tb.set_margin_bottom(2)
+        tb.set_homogeneous(False)
         self.pack_start(tb, False, False, 0)
 
         def mk(label: str, tip: str, cb) -> Gtk.Button:
@@ -282,6 +283,7 @@ class HtmlNoteEditor(Gtk.Box):
         self.web.connect("decide-policy", self._on_decide_policy)
         self.web.set_hexpand(True)
         self.web.set_vexpand(True)
+        self.web.set_size_request(-1, -1)
         self.pack_start(self.web, True, True, 0)
 
         self.web.load_html(_build_editor_html(self._editor_theme), "file:///")

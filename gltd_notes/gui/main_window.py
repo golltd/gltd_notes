@@ -432,12 +432,15 @@ class MainWindow(Gtk.Window):
     def _setup_paned_positions(self) -> None:
         def _set_positions():
             if hasattr(self, "_main_paned"):
-                self._main_paned.set_position(220)
+                self._main_paned.set_position(210)
             if hasattr(self, "_editor_paned"):
                 width = self.get_allocated_width()
-                side_w = 180 if width > 1000 else 150
-                target = max(320, width - side_w - 260)
-                self._editor_paned.set_position(target)
+                if width < 800:
+                    self._side_panel.set_visible(False)
+                else:
+                    side_w = 170
+                    target = width - side_w - 220
+                    self._editor_paned.set_position(max(350, target))
             return False
         GLib.idle_add(_set_positions)
 
@@ -1491,12 +1494,14 @@ class MainWindow(Gtk.Window):
         title_lbl.set_max_width_chars(28)
 
         title_eb = Gtk.EventBox()
+        title_eb.set_visible_window(True)
         title_eb.add(title_lbl)
         title_eb.connect("button-press-event", self._on_tab_button_press)
         tab_label_box.pack_start(title_eb, True, True, 0)
 
         close_lbl = Gtk.Label(label=" ✕ ")
         close_eb = Gtk.EventBox()
+        close_eb.set_visible_window(True)
         close_eb.set_tooltip_text("Fechar aba")
         close_eb.add(close_lbl)
         close_eb.connect("button-press-event", self._on_tab_close_press)
