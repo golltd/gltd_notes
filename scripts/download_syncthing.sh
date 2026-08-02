@@ -29,14 +29,25 @@ echo ""
 TMP_DIR=$(mktemp -d)
 trap "rm -rf $TMP_DIR" EXIT
 
-echo "[1/2] Baixando versao mais recente..."
-URL="https://github.com/syncthing/syncthing/releases/latest/download/syncthing-${ST_ARCH}.tar.gz"
+echo "[1/2] Obtendo versao mais recente..."
+API_URL="https://api.github.com/repos/syncthing/syncthing/releases/latest"
+LATEST_TAG=$(curl -fsSL "$API_URL" | grep -oP '"tag_name":\s*"\K[^"]+')
+if [ -z "$LATEST_TAG" ]; then
+    echo "ERRO: nao foi possivel obter a versao mais recente do Syncthing"
+    exit 1
+fi
+echo "  Versao: $LATEST_TAG"
+
+FILENAME="syncthing-${ST_ARCH}-${LATEST_TAG}.tar.gz"
+URL="https://github.com/syncthing/syncthing/releases/download/${LATEST_TAG}/${FILENAME}"
+echo "  URL: $URL"
+
+echo "[2/2] Baixando e extraindo..."
 curl -fsSL -o "$TMP_DIR/syncthing.tar.gz" "$URL" || {
-    echo "ERRO: falha no download de $URL"
+    echo "ERRO: falha no download. Verifique a URL: $URL"
     exit 1
 }
 
-echo "[2/2] Extraindo..."
 tar xzf "$TMP_DIR/syncthing.tar.gz" -C "$TMP_DIR"
 BIN_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "syncthing-*" | head -1)
 if [ -z "$BIN_DIR" ]; then
