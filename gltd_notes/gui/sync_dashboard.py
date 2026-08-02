@@ -235,7 +235,7 @@ class SyncDashboard(Gtk.Dialog):
         add_box.pack_start(self._friend_entry, True, True, 0)
 
         friend_dev_entry = Gtk.Entry()
-        friend_dev_entry.set_placeholder_text="Device ID (opcional)"
+        friend_dev_entry.set_placeholder_text("Device ID (opcional)")
         add_box.pack_start(friend_dev_entry, True, True, 0)
         self._friend_dev_entry = friend_dev_entry
 
