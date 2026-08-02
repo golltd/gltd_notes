@@ -1,40 +1,49 @@
 #!/usr/bin/env bash
 # Download Syncthing binary for GLTD Notes embedded sync
-# Usage: ./scripts/download_syncthing.sh [version] [install_dir]
+# Usage: sudo ./scripts/download_syncthing.sh [install_dir]
 set -euo pipefail
 
-VERSION="${1:-}"
-if [ -z "$VERSION" ]; then
-    VERSION=$(cat "$(dirname "${BASH_SOURCE[0]}")/../gltd_notes/syncthing_version.txt" | head -1)
-fi
-
-INSTALL_DIR="${2:-/var/PROGRAMAS/gltd_notes/bin}"
+INSTALL_DIR="${1:-/var/PROGRAMAS/gltd_notes/ext_program}"
 mkdir -p "$INSTALL_DIR"
 
-URL="https://github.com/syncthing/syncthing/releases/download/${VERSION}/syncthing-${ST_ARCH}-${VERSION}.tar.gz"
-SHA256_URL="${URL}.sha256"
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64)  ST_ARCH="linux-amd64" ;;
+    aarch64) ST_ARCH="linux-arm64" ;;
+    armv7l)  ST_ARCH="linux-arm" ;;
+    *) echo "ERRO: arquitetura nao suportada: $ARCH"; exit 1 ;;
+esac
 
-echo "Baixando Syncthing ${VERSION} para ${ST_ARCH}..."
+echo "============================================"
+echo "  GLTD Notes — Instalador Syncthing"
+echo "  Arquitetura: $ST_ARCH"
+echo "  Destino:     $INSTALL_DIR/syncthing"
+echo "============================================"
+echo ""
+
 TMP_DIR=$(mktemp -d)
 trap "rm -rf $TMP_DIR" EXIT
 
-curl -fsSL "$URL" -o "$TMP_DIR/syncthing.tar.gz"
-curl -fsSL "$SHA256_URL" -o "$TMP_DIR/syncthing.tar.gz.sha256"
+echo "[1/2] Baixando versao mais recente..."
+URL="https://github.com/syncthing/syncthing/releases/latest/download/syncthing-${ST_ARCH}.tar.gz"
+curl -fsSL -o "$TMP_DIR/syncthing.tar.gz" "$URL" || {
+    echo "ERRO: falha no download de $URL"
+    exit 1
+}
 
-echo "Verificando checksum..."
-cd "$TMP_DIR"
-EXPECTED=$(awk '{print $1}' syncthing.tar.gz.sha256)
-ACTUAL=$(sha256sum syncthing.tar.gz | awk '{print $1}')
-if [ "$EXPECTED" != "$ACTUAL" ]; then
-    echo "ERRO: checksum invalido!"
-    echo "  esperado: $EXPECTED"
-    echo "  obtido:   $ACTUAL"
+echo "[2/2] Extraindo..."
+tar xzf "$TMP_DIR/syncthing.tar.gz" -C "$TMP_DIR"
+BIN_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "syncthing-*" | head -1)
+if [ -z "$BIN_DIR" ]; then
+    echo "ERRO: diretorio syncthing nao encontrado apos extracao"
     exit 1
 fi
 
-echo "Extraindo..."
-tar xzf syncthing.tar.gz
-cp syncthing-${ST_ARCH}-${VERSION}/syncthing "$INSTALL_DIR/syncthing"
+cp "$BIN_DIR/syncthing" "$INSTALL_DIR/syncthing"
 chmod +x "$INSTALL_DIR/syncthing"
 
-echo "Syncthing ${VERSION} instalado em $INSTALL_DIR/syncthing"
+VER=$("$INSTALL_DIR/syncthing" --version | head -1)
+echo "  Versao: $VER"
+echo ""
+echo "Syncthing instalado em $INSTALL_DIR/syncthing"
+echo "Execute o GLTD Notes para configurar automaticamente."

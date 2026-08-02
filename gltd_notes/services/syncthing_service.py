@@ -46,7 +46,7 @@ class SyncthingService:
         custom = self.config.data.get("syncthing", {}).get("bin_path", "")
         if custom:
             return Path(custom).expanduser()
-        return DEFAULT_INSTALL_ROOT / "bin" / "syncthing"
+        return DEFAULT_INSTALL_ROOT / "ext_program" / "syncthing"
 
     def _home_dir(self) -> Path:
         default = str(self.config.data_root / "syncthing")
@@ -64,6 +64,12 @@ class SyncthingService:
         home = self._home_dir()
         home.mkdir(parents=True, exist_ok=True)
         port = self.config.data.get("syncthing", {}).get("port", DEFAULT_GUI_PORT)
+
+        config_xml = home / "config.xml"
+        if not config_xml.exists():
+            if not self._init_config(bin_path, home, port, config_xml):
+                return False
+
         try:
             self._process = subprocess.Popen(
                 [str(bin_path), "--home", str(home), "--no-browser",
@@ -75,6 +81,81 @@ class SyncthingService:
             return True
         except OSError as e:
             _log.warning("Failed to start syncthing: %s", e)
+            return False
+
+    def _init_config(self, bin_path: Path, home: Path, port: int, config_xml: Path) -> bool:
+        _log.info("Initializing Syncthing config at %s", home)
+        try:
+            proc = subprocess.Popen(
+                [str(bin_path), "--home", str(home), "--no-browser",
+                 f"--gui-address=127.0.0.1:{port}", "--no-restart"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            for _ in range(30):
+                if config_xml.exists():
+                    break
+                time.sleep(0.5)
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+
+            if not config_xml.exists():
+                return False
+
+            import xml.etree.ElementTree as ET
+            ET.register_namespace("", "http://syncthing.net/ns/config/1")
+            tree = ET.parse(str(config_xml))
+            root = tree.getroot()
+
+            # Device name
+            gui = root.find(".//gui")
+            if gui is not None:
+                for el_name, val in [
+                    ("address", f"127.0.0.1:{port}"),
+                    ("tls", "false"),
+                    ("apikey", ""),
+                ]:
+                    el = gui.find(el_name)
+                    if el is not None:
+                        el.text = val
+
+            # Options
+            opts = root.find("options")
+            if opts is not None:
+                for el_name, val in [
+                    ("globalAnnounceEnabled", "false"),
+                    ("localAnnounceEnabled", "true"),
+                    ("relaysEnabled", "false"),
+                    ("natEnabled", "false"),
+                    ("autoUpgradeIntervalH", "0"),
+                ]:
+                    el = opts.find(el_name)
+                    if el is not None:
+                        el.text = val
+
+            # Set device name from options
+            device_name = f"gltd_notes_{socket.gethostname()}"
+            for el_name, val in [("deviceName", device_name)]:
+                el = opts.find(el_name) if el_name == "deviceName" else None
+                if el is None:
+                    el = root.find(f"{{{root.tag.split('}')[0] if '}' in root.tag else ''}}}{el_name}")
+                if el is not None:
+                    el.text = val
+
+            if opts is not None:
+                dn = opts.find("deviceName")
+                if dn is None:
+                    ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+                    dn = ET.SubElement(opts, f"{{{ns}}}deviceName" if ns else "deviceName")
+                dn.text = device_name
+
+            tree.write(str(config_xml), encoding="utf-8", xml_declaration=True)
+            _log.info("Syncthing config initialized: %s", device_name)
+            return True
+        except Exception as e:
+            _log.warning("Failed to init Syncthing config: %s", e)
             return False
 
     def stop(self) -> None:
@@ -111,19 +192,28 @@ class SyncthingService:
     # ── API key ─────────────────────────────────────────────────
 
     def _ensure_api_key(self) -> None:
-        time.sleep(2)  # wait for startup
-        config_path = self._home_dir() / "config.xml"
+        time.sleep(2)
+        config_xml = self._home_dir() / "config.xml"
         for _ in range(15):
-            if config_path.exists():
+            if config_xml.exists():
                 break
             time.sleep(1)
-        if not config_path.exists():
+        if not config_xml.exists():
             return
         import xml.etree.ElementTree as ET
-        tree = ET.parse(str(config_path))
-        gui = tree.find(".//gui")
+
+        tree = ET.parse(str(config_xml))
+        root = tree.getroot()
+        ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+        if ns:
+            gui = root.find(f"{{{ns}}}gui")
+        else:
+            gui = root.find("gui")
         if gui is not None:
-            apikey_el = gui.find("apikey")
+            if ns:
+                apikey_el = gui.find(f"{{{ns}}}apikey")
+            else:
+                apikey_el = gui.find("apikey")
             if apikey_el is not None and apikey_el.text:
                 self._api_key = apikey_el.text
                 sc = self.config.data.setdefault("syncthing", {})
