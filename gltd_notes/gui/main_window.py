@@ -1524,25 +1524,32 @@ class MainWindow(Gtk.Window):
         self._tab_switching = False
         self._load_note(note_id)
 
-    def _on_tab_close_press(self, eb: Gtk.EventBox, event: Gdk.EventButton) -> bool:
-        if event.button != 1:
-            return False
+    def _find_tab_by_child(self, widget: Gtk.Widget) -> int:
         for i in range(self.notebook.get_n_pages()):
             tab = self.notebook.get_tab_label(self.notebook.get_nth_page(i))
-            if tab is not None and tab.is_ancestor(eb):
-                self._close_tab(i)
-                return True
+            if tab is not None and (widget is tab or tab.is_ancestor(widget)):
+                return i
+        return -1
+
+    def _on_tab_close_press(self, eb: Gtk.EventBox, event: Gdk.EventButton) -> bool:
+        if event.button == 3:
+            return self._on_tab_button_press(eb, event)
+        if event.button != 1:
+            return False
+        idx = self._find_tab_by_child(eb)
+        if idx >= 0:
+            self._close_tab(idx)
+            return True
         return False
 
     def _on_tab_button_press(self, widget: Gtk.Widget, event: Gdk.EventButton) -> bool:
         if event.type != Gdk.EventType.BUTTON_PRESS or event.button != 3:
             return False
-        for i in range(self.notebook.get_n_pages()):
-            tab = self.notebook.get_tab_label(self.notebook.get_nth_page(i))
-            if widget is tab or (isinstance(tab, Gtk.Widget) and tab.is_ancestor(widget)):
-                self._context_tab_page = i
-                self._tab_context_menu.popup_at_pointer(event)
-                return True
+        idx = self._find_tab_by_child(widget)
+        if idx >= 0:
+            self._context_tab_page = idx
+            self._tab_context_menu.popup_at_pointer(event)
+            return True
         return False
 
     def _on_context_close_tab(self) -> None:
