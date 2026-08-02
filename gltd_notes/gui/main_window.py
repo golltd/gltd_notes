@@ -519,6 +519,7 @@ class MainWindow(Gtk.Window):
 
         conf_m = self._mnemonic_menu(menubar, t("menu_settings"))
         self._menu_settings = self._mnemonic_item(conf_m, t("preferences"), self._open_settings)
+        self._mnemonic_item(conf_m, "Syncthing", self._open_sync_dashboard)
         self._menu_api = self._mnemonic_item(conf_m, t("api_key"), self._show_api_key)
 
         web_m = self._mnemonic_menu(menubar, "Interface _Web")
@@ -3098,10 +3099,13 @@ class MainWindow(Gtk.Window):
             self._sync_btn.set_label("  Sync: —  ")
         return True
 
-    def _show_sync_details(self) -> None:
-        from gltd_notes.gui.sync_dialog import show_sync_dialog
+    def _open_sync_dashboard(self) -> None:
+        from gltd_notes.gui.sync_dashboard import SyncDashboard
 
-        show_sync_dialog(self, self._sync_service)
+        SyncDashboard.show(self, self.config, getattr(self, "_sync_service", None))
+
+    def _show_sync_details(self) -> None:
+        self._open_sync_dashboard()
 
     # ── Web UI process control ───────────────────────────────
     def _web_status_text(self) -> str:
