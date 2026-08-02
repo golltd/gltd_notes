@@ -85,12 +85,24 @@ class SyncthingService:
                 self._process.kill()
             self._process = None
 
+    def restart(self) -> bool:
+        self.stop()
+        time.sleep(1)
+        return self.start()
+
+    def ping(self) -> bool:
+        try:
+            return self._api_get("system/ping", "{}").get("ping") == "pong"
+        except Exception:
+            return False
+
     def is_running(self) -> bool:
         if self._mode == "embedded":
-            return self._process is not None and self._process.poll() is None
+            if self._process is not None and self._process.poll() is None:
+                return True
+            return self.ping()
         if self._mode == "external":
-            return self._api_get("system/ping", "{}").get("ping") == "pong"
-        return False
+            return self.ping()
 
     # ── API key ─────────────────────────────────────────────────
 

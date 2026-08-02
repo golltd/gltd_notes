@@ -92,6 +92,29 @@ class SyncDashboard(Gtk.Dialog):
         self._name_entry.set_text(self._device_name)
         name_box.pack_start(self._name_entry, True, True, 0)
 
+        # ── Status + controle ──
+        status_frame = Gtk.Frame(label="Status do Syncthing")
+        content.pack_start(status_frame, False, False, 0)
+        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin=8)
+        status_frame.add(status_box)
+
+        self._status_lbl = Gtk.Label(xalign=0)
+        self._status_lbl.set_line_wrap(True)
+        status_box.pack_start(self._status_lbl, False, False, 0)
+
+        ctrl_box = Gtk.Box(spacing=6)
+        status_box.pack_start(ctrl_box, False, False, 0)
+
+        restart_btn = Gtk.Button(label="Reiniciar Syncthing")
+        restart_btn.connect("clicked", lambda *_: self._restart_sync())
+        ctrl_box.pack_start(restart_btn, False, False, 0)
+
+        stop_btn = Gtk.Button(label="Parar Syncthing")
+        stop_btn.connect("clicked", lambda *_: self._stop_sync())
+        ctrl_box.pack_start(stop_btn, False, False, 0)
+
+        self._refresh_status()
+
         # ── Notebook: devices / friends ──
         notebook = Gtk.Notebook()
         notebook.set_vexpand(True)
@@ -114,8 +137,11 @@ class SyncDashboard(Gtk.Dialog):
     def _make_service(self) -> Optional[SyncthingService]:
         try:
             from gltd_notes.services.syncthing_service import SyncthingService
-            return SyncthingService(self.config)
-        except Exception:
+            svc = SyncthingService(self.config)
+            return svc
+        except Exception as e:
+            import logging
+            logging.getLogger("gltd_notes").warning("SyncDashboard: falha ao criar SyncthingService: %s", e)
             return None
 
     def _get_my_device_id(self) -> str:
@@ -195,7 +221,42 @@ class SyncDashboard(Gtk.Dialog):
         self._net_tree = tree
         return box
 
-    def _refresh_network_devices(self) -> bool:
+    def _refresh_status(self) -> None:
+        if self._sync is None:
+            self._status_lbl.set_text("Syncthing nao configurado.")
+            return
+        running = self._sync.is_running()
+        if not running:
+            self._status_lbl.set_text("Estado: PARADO\nPorta: configurada nas preferencias")
+            return
+        try:
+            ss = self._sync.get_system_status()
+            fs = self._sync.get_folder_status()
+            lines = [
+                f"Estado: RODANDO",
+                f"Uptime: {ss.get('uptime', 0)}s",
+                f"Conexoes ativas: {ss.get('numConnections', 0)}",
+                f"Pasta GLTD Notes: {fs.get('state', '?')} ({fs.get('globalFiles', '?')} arquivos)",
+                f"Memoria: {ss.get('alloc', 0) / 1024 / 1024:.1f} MB",
+            ]
+            self._status_lbl.set_text("\n".join(lines))
+        except Exception:
+            self._status_lbl.set_text("Estado: RODANDO (status indisponivel)")
+
+    def _restart_sync(self) -> None:
+        if self._sync and self._sync._mode == "embedded":
+            self._sync.restart()
+            self._status_lbl.set_text("Reiniciando...")
+            GLib.timeout_add_seconds(3, lambda: (self._refresh_status(), self._refresh_network_devices(), False))
+        else:
+            self._status_lbl.set_text("Reinicio disponivel apenas no modo embarcado.")
+
+    def _stop_sync(self) -> None:
+        if self._sync and self._sync._mode == "embedded":
+            self._sync.stop()
+            self._status_lbl.set_text("Estado: PARADO")
+        else:
+            self._status_lbl.set_text("Parada disponivel apenas no modo embarcado.")
         self._net_store.clear()
         if self._sync is None or not self._sync.is_running():
             self._net_store.append(["— Syncthing offline —", "", ""])

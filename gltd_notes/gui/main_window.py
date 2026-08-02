@@ -946,8 +946,8 @@ class MainWindow(Gtk.Window):
 
         self._sync_btn = Gtk.Button(label="  Sync: —  ")
         self._sync_btn.set_relief(Gtk.ReliefStyle.NONE)
-        self._sync_btn.set_tooltip_text("Status de sincronizacao — clique para detalhes")
-        self._sync_btn.connect("clicked", lambda *_: self._show_sync_details())
+        self._sync_btn.set_tooltip_text("Status de sincronizacao — clique para abrir painel Syncthing")
+        self._sync_btn.connect("clicked", lambda *_: self._open_sync_dashboard())
         self._sync_btn.hide()
         outer.pack_start(self._sync_btn, False, False, 0)
 
@@ -3073,28 +3073,35 @@ class MainWindow(Gtk.Window):
         self._sync_service = SyncthingService(self.config)
         if self._sync_service._mode == "none":
             return
+        self._sync_btn.set_label("  Sync: iniciando...  ")
         self._sync_btn.show()
         if self._sync_service._mode == "embedded":
-            self._sync_service.start()
-        GLib.timeout_add_seconds(15, self._update_sync_status)
+            ok = self._sync_service.start()
+            if not ok:
+                self._sync_btn.set_label("  Sync: binario nao encontrado  ")
+            else:
+                GLib.timeout_add_seconds(5, self._update_sync_status)
+        else:
+            GLib.timeout_add_seconds(5, self._update_sync_status)
 
     def _update_sync_status(self) -> bool:
         if not hasattr(self, "_sync_service"):
             return False
         try:
-            if not self._sync_service.is_running():
-                self._sync_btn.set_label("  Sync: offline  ")
+            running = self._sync_service.is_running()
+            if not running:
+                self._sync_btn.set_markup('<span foreground="#f7768e">  Sync: offline  </span>')
                 return True
             status = self._sync_service.get_folder_status()
             state = status.get("state", "unknown")
             if state == "idle":
-                self._sync_btn.set_label("  Sync: OK  ")
+                self._sync_btn.set_markup('<span foreground="#9ece6a">  Sync: OK  </span>')
             elif state in ("syncing", "scanning"):
                 comp = self._sync_service.get_completion()
                 pct = int(comp.get("completion", 0))
-                self._sync_btn.set_label(f"  Sync: {pct}%  ")
+                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {pct}%  </span>')
             else:
-                self._sync_btn.set_label(f"  Sync: {state}  ")
+                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {state}  </span>')
         except Exception:
             self._sync_btn.set_label("  Sync: —  ")
         return True
