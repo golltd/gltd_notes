@@ -3076,9 +3076,29 @@ class MainWindow(Gtk.Window):
         self._sync_btn.set_label("  Sync: iniciando...  ")
         self._sync_btn.show()
         if self._sync_service._mode == "embedded":
+            if not self._sync_service._bin_path().exists():
+                self._sync_btn.set_label("  Sync: binario nao encontrado  ")
+                dialog = Gtk.MessageDialog(
+                    transient_for=self,
+                    message_type=Gtk.MessageType.QUESTION,
+                    buttons=Gtk.ButtonsType.OK_CANCEL,
+                    text="Syncthing nao encontrado",
+                )
+                dialog.format_secondary_text(
+                    "O binario do Syncthing nao foi encontrado em:\n"
+                    f"{self._sync_service._bin_path()}\n\n"
+                    "Deseja baixar e instalar agora?\n"
+                    "(Configuracoes > Sync > Baixar / Instalar Syncthing)"
+                )
+                if dialog.run() == Gtk.ResponseType.OK:
+                    dialog.destroy()
+                    self._open_settings()
+                else:
+                    dialog.destroy()
+                return
             ok = self._sync_service.start()
             if not ok:
-                self._sync_btn.set_label("  Sync: binario nao encontrado  ")
+                self._sync_btn.set_label("  Sync: falha ao iniciar  ")
             else:
                 GLib.timeout_add_seconds(5, self._update_sync_status)
         else:

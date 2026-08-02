@@ -141,6 +141,27 @@ class SettingsDialog(Gtk.Dialog):
         self.sync_api_key.set_visibility(False)
         self._sync_external_box.pack_start(self.sync_api_key, False, False, 0)
 
+        # Embedded settings
+        self._sync_embedded_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.pack_start(self._sync_embedded_box, False, False, 0)
+
+        from gltd_notes.utils.paths import DEFAULT_INSTALL_ROOT
+
+        lbl3 = Gtk.Label(label="Caminho do binario Syncthing", xalign=0)
+        self._sync_embedded_box.pack_start(lbl3, False, False, 0)
+        default_bin = str(DEFAULT_INSTALL_ROOT / "bin" / "syncthing")
+        self.sync_bin_path = Gtk.Entry()
+        self.sync_bin_path.set_text(sc.get("bin_path", default_bin))
+        self.sync_bin_path.set_placeholder_text(default_bin)
+        self._sync_embedded_box.pack_start(self.sync_bin_path, False, False, 0)
+
+        dl_btn = Gtk.Button(label="Baixar / Instalar Syncthing")
+        dl_btn.set_tooltip_text("Faz download do binario oficial do Syncthing para o caminho acima")
+        dl_btn.connect("clicked", lambda *_: self._download_syncthing())
+        self._sync_embedded_box.pack_start(dl_btn, False, False, 0)
+        self._sync_dl_status = Gtk.Label(label="", xalign=0)
+        self._sync_embedded_box.pack_start(self._sync_dl_status, False, False, 0)
+
         self._update_sync_fields()
 
         save = Gtk.Button(label=t("save_settings"))
@@ -154,6 +175,7 @@ class SettingsDialog(Gtk.Dialog):
         idx = self.sync_mode_combo.get_active()
         mode = self._sync_mode_codes[idx] if 0 <= idx < len(self._sync_mode_codes) else "none"
         self._sync_external_box.set_visible(mode == "external")
+        self._sync_embedded_box.set_visible(mode == "embedded")
 
     def _on_save_sync(self, *_args) -> None:
         idx = self.sync_mode_combo.get_active()
@@ -163,8 +185,24 @@ class SettingsDialog(Gtk.Dialog):
         if mode == "external":
             sc["api_url"] = self.sync_api_url.get_text()
             sc["api_key"] = self.sync_api_key.get_text()
+        if mode == "embedded":
+            sc["bin_path"] = self.sync_bin_path.get_text()
         self.config.save()
         self.sync_status.set_text(t("settings_saved"))
+
+    def _download_syncthing(self) -> None:
+        self._sync_dl_status.set_text("Baixando...")
+        try:
+            import subprocess, os
+            script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "download_syncthing.sh")
+            bin_dir = os.path.dirname(self.sync_bin_path.get_text()) or "/var/PROGRAMAS/gltd_notes/bin"
+            r = subprocess.run(["sudo", "bash", script, "", bin_dir], capture_output=True, text=True, timeout=120)
+            if r.returncode == 0:
+                self._sync_dl_status.set_text("Syncthing instalado com sucesso!")
+            else:
+                self._sync_dl_status.set_text(f"Erro:\n{r.stderr[:300]}")
+        except Exception as e:
+            self._sync_dl_status.set_text(f"Erro: {e}")
 
     def _page_security(self) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10, margin=12)

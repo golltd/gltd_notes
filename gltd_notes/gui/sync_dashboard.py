@@ -121,6 +121,11 @@ class SyncDashboard(Gtk.Dialog):
         stop_btn.connect("clicked", lambda *_: self._stop_sync())
         ctrl_box.pack_start(stop_btn, False, False, 0)
 
+        dl_btn = Gtk.Button(label="Baixar Syncthing")
+        dl_btn.set_tooltip_text("Faz download do binario oficial do Syncthing")
+        dl_btn.connect("clicked", lambda *_: self._download_syncthing())
+        ctrl_box.pack_start(dl_btn, False, False, 0)
+
         self._refresh_status()
 
         # ── Notebook: devices / friends ──
@@ -269,6 +274,20 @@ class SyncDashboard(Gtk.Dialog):
             self._status_lbl.set_text("Estado: PARADO")
         else:
             self._status_lbl.set_text("Parada disponivel apenas no modo embarcado.")
+
+    def _download_syncthing(self) -> None:
+        self._status_lbl.set_text("Baixando Syncthing...")
+        try:
+            import os
+            script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "download_syncthing.sh")
+            bin_dir = str(self._sync._bin_path().parent) if self._sync else "/var/PROGRAMAS/gltd_notes/bin"
+            r = subprocess.run(["sudo", "bash", script, "", bin_dir], capture_output=True, text=True, timeout=120)
+            if r.returncode == 0:
+                self._status_lbl.set_text("Syncthing instalado! Reinicie o GLTD Notes.")
+            else:
+                self._status_lbl.set_text(f"Erro: {r.stderr[:200]}")
+        except Exception as e:
+            self._status_lbl.set_text(f"Erro: {e}")
 
     def _refresh_network_devices(self) -> bool:
         if not hasattr(self, "_net_store"):

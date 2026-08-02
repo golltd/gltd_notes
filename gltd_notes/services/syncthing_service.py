@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, List, Optional
 from urllib.request import Request, urlopen
 
 from gltd_notes.config import Config
+from gltd_notes.utils.paths import DEFAULT_INSTALL_ROOT
 
 _log = logging.getLogger("gltd_notes")
 
@@ -42,7 +43,10 @@ class SyncthingService:
             self._api_key = ""
 
     def _bin_path(self) -> Path:
-        return Path.home() / ".local" / "share" / "gltd_notes" / "syncthing" / "syncthing"
+        custom = self.config.data.get("syncthing", {}).get("bin_path", "")
+        if custom:
+            return Path(custom).expanduser()
+        return DEFAULT_INSTALL_ROOT / "bin" / "syncthing"
 
     def _home_dir(self) -> Path:
         return Path(self.config.data.get("syncthing", {}).get("home_dir",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Download Syncthing binary for GLTD Notes embedded sync
-# Usage: ./scripts/download_syncthing.sh [version]
+# Usage: ./scripts/download_syncthing.sh [version] [install_dir]
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -8,15 +8,7 @@ if [ -z "$VERSION" ]; then
     VERSION=$(cat "$(dirname "${BASH_SOURCE[0]}")/../gltd_notes/syncthing_version.txt" | head -1)
 fi
 
-ARCH=$(uname -m)
-case "$ARCH" in
-    x86_64)  ST_ARCH="linux-amd64" ;;
-    aarch64) ST_ARCH="linux-arm64" ;;
-    armv7l)  ST_ARCH="linux-arm" ;;
-    *) echo "ERRO: arquitetura nao suportada: $ARCH"; exit 1 ;;
-esac
-
-INSTALL_DIR="${HOME}/.local/share/gltd_notes/syncthing"
+INSTALL_DIR="${2:-/var/PROGRAMAS/gltd_notes/bin}"
 mkdir -p "$INSTALL_DIR"
 
 URL="https://github.com/syncthing/syncthing/releases/download/${VERSION}/syncthing-${ST_ARCH}-${VERSION}.tar.gz"
