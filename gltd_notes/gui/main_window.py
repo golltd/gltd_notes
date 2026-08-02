@@ -1527,13 +1527,24 @@ class MainWindow(Gtk.Window):
     def _find_tab_by_child(self, widget: Gtk.Widget) -> int:
         for i in range(self.notebook.get_n_pages()):
             tab = self.notebook.get_tab_label(self.notebook.get_nth_page(i))
-            if tab is not None and (widget is tab or tab.is_ancestor(widget)):
+            if tab is None:
+                continue
+            if widget is tab or tab.is_ancestor(widget):
                 return i
+        w = widget.get_parent()
+        while w is not None:
+            for i in range(self.notebook.get_n_pages()):
+                if self.notebook.get_tab_label(self.notebook.get_nth_page(i)) is w:
+                    return i
+            w = w.get_parent()
         return -1
 
     def _on_tab_close_press(self, eb: Gtk.EventBox, event: Gdk.EventButton) -> bool:
         if event.button == 3:
-            return self._on_tab_button_press(eb, event)
+            self._context_tab_page = self._find_tab_by_child(eb)
+            if self._context_tab_page >= 0:
+                self._tab_context_menu.popup(None, None, None, None, event.button, event.time)
+            return True
         if event.button != 1:
             return False
         idx = self._find_tab_by_child(eb)
@@ -1548,7 +1559,7 @@ class MainWindow(Gtk.Window):
         idx = self._find_tab_by_child(widget)
         if idx >= 0:
             self._context_tab_page = idx
-            self._tab_context_menu.popup_at_pointer(event)
+            self._tab_context_menu.popup(None, None, None, None, event.button, event.time)
             return True
         return False
 
