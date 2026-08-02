@@ -49,8 +49,8 @@ class SyncthingService:
         return DEFAULT_INSTALL_ROOT / "bin" / "syncthing"
 
     def _home_dir(self) -> Path:
-        return Path(self.config.data.get("syncthing", {}).get("home_dir",
-               "~/.config/gltd_notes/syncthing")).expanduser()
+        default = str(self.config.data_root / "syncthing")
+        return Path(self.config.data.get("syncthing", {}).get("home_dir", default))
 
     # ── lifecycle ──────────────────────────────────────────────
 
