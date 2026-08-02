@@ -1498,8 +1498,15 @@ class MainWindow(Gtk.Window):
         close_btn.set_focus_on_click(False)
         close_btn.set_tooltip_text("Fechar aba")
         close_btn.connect("clicked", self._on_tab_close_clicked)
+        close_btn.connect("button-press-event", lambda btn, ev: self._on_tab_close_clicked(btn) or True)
         tab_label_box.pack_start(close_btn, False, False, 0)
         tab_label_box.show_all()
+
+        eb = Gtk.EventBox()
+        eb.set_visible_window(True)
+        eb.add(tab_label_box)
+        eb.connect("button-press-event", self._on_tab_button_press)
+        eb.show_all()
 
         page = Gtk.Box()
         page._note_id = note_id
@@ -1508,7 +1515,7 @@ class MainWindow(Gtk.Window):
         page._note_fav = is_fav
         page.show()
 
-        self.notebook.append_page(page, tab_label_box)
+        self.notebook.append_page(page, eb)
         self.notebook.set_show_tabs(True)
         self._open_tabs[note_id] = {"title": note_title, "kind": kind}
 
