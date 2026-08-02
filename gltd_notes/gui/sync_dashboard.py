@@ -281,7 +281,7 @@ class SyncDashboard(Gtk.Dialog):
             import os
             script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "download_syncthing.sh")
             bin_dir = str(self._sync._bin_path().parent) if self._sync else "/var/PROGRAMAS/gltd_notes/ext_program"
-            r = subprocess.run(["pkexec", "bash", script, bin_dir], capture_output=True, text=True, timeout=120)
+            r = subprocess.run(["bash", script, bin_dir], capture_output=True, text=True, timeout=120)
             if r.returncode == 0:
                 self._status_lbl.set_text("Syncthing instalado! Reinicie o GLTD Notes.")
             else:

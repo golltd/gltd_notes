@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Download Syncthing binary for GLTD Notes embedded sync
-# Usage: sudo ./scripts/download_syncthing.sh [install_dir]
+# Usage: ./scripts/download_syncthing.sh [install_dir]
 set -euo pipefail
 
 INSTALL_DIR="${1:-/var/PROGRAMAS/gltd_notes/ext_program}"
-mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
+if [ ! -w "$INSTALL_DIR" ]; then
+    echo "ERRO: sem permissao de escrita em $INSTALL_DIR"
+    echo "Execute: chown -R \$USER:\$USER $INSTALL_DIR"
+    exit 1
+fi
 
 ARCH=$(uname -m)
 case "$ARCH" in

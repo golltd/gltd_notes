@@ -196,7 +196,7 @@ class SettingsDialog(Gtk.Dialog):
             import subprocess, os
             script = os.path.join(os.path.dirname(__file__), "..", "..", "scripts", "download_syncthing.sh")
             bin_dir = os.path.dirname(self.sync_bin_path.get_text()) or str(DEFAULT_INSTALL_ROOT / "ext_program")
-            r = subprocess.run(["pkexec", "bash", script, bin_dir], capture_output=True, text=True, timeout=120)
+            r = subprocess.run(["bash", script, bin_dir], capture_output=True, text=True, timeout=120)
             if r.returncode == 0:
                 self._sync_dl_status.set_text("Syncthing instalado com sucesso!")
             else:
