@@ -57,8 +57,10 @@ class SyncDashboard(Gtk.Dialog):
 
         content = self.get_content_area()
         content.set_spacing(8)
-        content.set_margin(12)
-        content.set_margin(12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
 
         # ── My device info ──
         my_frame = Gtk.Frame(label="Meu dispositivo")
@@ -211,7 +213,10 @@ class SyncDashboard(Gtk.Dialog):
         dlg.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, "Adicionar", Gtk.ResponseType.OK)
         content = dlg.get_content_area()
         content.set_spacing(6)
-        content.set_margin(8)
+        content.set_margin_top(8)
+        content.set_margin_bottom(8)
+        content.set_margin_start(8)
+        content.set_margin_end(8)
 
         content.pack_start(Gtk.Label(label="Device ID:", xalign=0), False, False, 0)
         id_entry = Gtk.Entry()
