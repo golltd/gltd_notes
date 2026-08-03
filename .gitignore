@@ -11,3 +11,4 @@ venv/
 *.swo
 *~
 *.deb
+ext_program/
