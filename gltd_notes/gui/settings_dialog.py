@@ -155,10 +155,20 @@ class SettingsDialog(Gtk.Dialog):
         self.sync_bin_path.set_placeholder_text(default_bin)
         self._sync_embedded_box.pack_start(self.sync_bin_path, False, False, 0)
 
-        dl_btn = Gtk.Button(label="Baixar / Instalar Syncthing")
-        dl_btn.set_tooltip_text("Faz download do binario oficial do Syncthing para o caminho acima")
-        dl_btn.connect("clicked", lambda *_: self._download_syncthing())
-        self._sync_embedded_box.pack_start(dl_btn, False, False, 0)
+        lbl4 = Gtk.Label(label="Porta da interface web (padrao: 8384)", xalign=0)
+        self._sync_embedded_box.pack_start(lbl4, False, False, 0)
+        self.sync_port = Gtk.Entry()
+        self.sync_port.set_text(str(sc.get("port", 18384)))
+        self.sync_port.set_placeholder_text("18384")
+        self._sync_embedded_box.pack_start(self.sync_port, False, False, 0)
+
+        import os
+        bin_exists = os.path.exists(self.sync_bin_path.get_text() or default_bin)
+        self._sync_dl_btn = Gtk.Button(label="Baixar / Instalar Syncthing")
+        self._sync_dl_btn.set_tooltip_text("Faz download do binario oficial do Syncthing para o caminho acima")
+        self._sync_dl_btn.connect("clicked", lambda *_: self._download_syncthing())
+        self._sync_dl_btn.set_visible(not bin_exists)
+        self._sync_embedded_box.pack_start(self._sync_dl_btn, False, False, 0)
         self._sync_dl_status = Gtk.Label(label="", xalign=0)
         self._sync_embedded_box.pack_start(self._sync_dl_status, False, False, 0)
 
@@ -181,14 +191,42 @@ class SettingsDialog(Gtk.Dialog):
         idx = self.sync_mode_combo.get_active()
         mode = self._sync_mode_codes[idx] if 0 <= idx < len(self._sync_mode_codes) else "none"
         sc = self.config.data.setdefault("syncthing", {})
+        old_port = sc.get("port", 18384)
         sc["mode"] = mode
         if mode == "external":
             sc["api_url"] = self.sync_api_url.get_text()
             sc["api_key"] = self.sync_api_key.get_text()
         if mode == "embedded":
             sc["bin_path"] = self.sync_bin_path.get_text()
+            new_port = int(self.sync_port.get_text() or 18384)
+            sc["port"] = new_port
+            if new_port != old_port:
+                self._reconfig_syncthing_port(sc, new_port)
         self.config.save()
         self.sync_status.set_text(t("settings_saved"))
+
+    def _reconfig_syncthing_port(self, sc: dict, port: int) -> None:
+        import os, xml.etree.ElementTree as ET
+        home = os.path.expanduser(sc.get("home_dir", str(self.config.data_root / "syncthing")))
+        config_xml = os.path.join(home, "config.xml")
+        if not os.path.exists(config_xml):
+            return
+        try:
+            ET.register_namespace("", "http://syncthing.net/ns/config/1")
+            tree = ET.parse(config_xml)
+            root = tree.getroot()
+            ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+            if ns:
+                gui = root.find(f"{{{ns}}}gui")
+            else:
+                gui = root.find("gui")
+            if gui is not None:
+                addr_el = gui.find(f"{{{ns}}}address") if ns else gui.find("address")
+                if addr_el is not None:
+                    addr_el.text = f"127.0.0.1:{port}"
+                    tree.write(config_xml, encoding="utf-8", xml_declaration=True)
+        except Exception:
+            pass
 
     def _download_syncthing(self) -> None:
         self._sync_dl_status.set_text("Baixando...")
