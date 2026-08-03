@@ -78,6 +78,7 @@ class SyncthingService:
             )
             self._ensure_api_key()
             self._configure_data_folder()
+            self._ensure_device_name()
             return True
         except OSError as e:
             _log.warning("Failed to start syncthing: %s", e)
@@ -108,46 +109,41 @@ class SyncthingService:
             ET.register_namespace("", "http://syncthing.net/ns/config/1")
             tree = ET.parse(str(config_xml))
             root = tree.getroot()
+            ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
 
-            # Device name
-            gui = root.find(".//gui")
+            def _find(parent, tag):
+                return parent.find(f"{{{ns}}}{tag}") if ns else parent.find(tag)
+
+            # GUI
+            gui = _find(root, "gui")
             if gui is not None:
-                for el_name, val in [
+                for el_tag, val in [
                     ("address", f"127.0.0.1:{port}"),
                     ("tls", "false"),
                     ("apikey", ""),
                 ]:
-                    el = gui.find(el_name)
+                    el = _find(gui, el_tag)
                     if el is not None:
                         el.text = val
 
             # Options
-            opts = root.find("options")
+            opts = _find(root, "options")
             if opts is not None:
-                for el_name, val in [
+                for el_tag, val in [
                     ("globalAnnounceEnabled", "false"),
                     ("localAnnounceEnabled", "true"),
                     ("relaysEnabled", "false"),
                     ("natEnabled", "false"),
                     ("autoUpgradeIntervalH", "0"),
                 ]:
-                    el = opts.find(el_name)
+                    el = _find(opts, el_tag)
                     if el is not None:
                         el.text = val
 
-            # Set device name from options
-            device_name = f"gltd_notes_{socket.gethostname()}"
-            for el_name, val in [("deviceName", device_name)]:
-                el = opts.find(el_name) if el_name == "deviceName" else None
-                if el is None:
-                    el = root.find(f"{{{root.tag.split('}')[0] if '}' in root.tag else ''}}}{el_name}")
-                if el is not None:
-                    el.text = val
-
-            if opts is not None:
-                dn = opts.find("deviceName")
+                # Device name
+                device_name = f"gltd_notes_{socket.gethostname()}"
+                dn = _find(opts, "deviceName")
                 if dn is None:
-                    ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
                     dn = ET.SubElement(opts, f"{{{ns}}}deviceName" if ns else "deviceName")
                 dn.text = device_name
 
@@ -189,7 +185,35 @@ class SyncthingService:
         if self._mode == "external":
             return self.ping()
 
-    # ── API key ─────────────────────────────────────────────────
+    def _ensure_device_name(self) -> None:
+        """Update device name in config.xml if not matching expected pattern."""
+        import xml.etree.ElementTree as ET
+
+        config_xml = self._home_dir() / "config.xml"
+        if not config_xml.exists():
+            return
+        try:
+            expected = f"gltd_notes_{socket.gethostname()}"
+            ET.register_namespace("", "http://syncthing.net/ns/config/1")
+            tree = ET.parse(str(config_xml))
+            root = tree.getroot()
+            ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+
+            def _find(parent, tag):
+                return parent.find(f"{{{ns}}}{tag}") if ns else parent.find(tag)
+
+            opts = _find(root, "options")
+            if opts is not None:
+                dn = _find(opts, "deviceName")
+                if dn is not None and dn.text == expected:
+                    return
+                if dn is None:
+                    dn = ET.SubElement(opts, f"{{{ns}}}deviceName" if ns else "deviceName")
+                dn.text = expected
+                tree.write(str(config_xml), encoding="utf-8", xml_declaration=True)
+                _log.info("Syncthing device name updated to: %s", expected)
+        except Exception:
+            pass
 
     def _ensure_api_key(self) -> None:
         time.sleep(2)
