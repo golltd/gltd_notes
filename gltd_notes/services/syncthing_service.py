@@ -225,11 +225,27 @@ class SyncthingService:
         data_root = str(self.config.data_root)
         folders = self._api_get("config/folders") or []
         folder_ids = [f.get("id", "") for f in folders]
-        if "gltd-notes-data" not in folder_ids:
+        uh = self.config.active_user_hash or "default"
+
+        # User's personal chain database
+        user_path = str(Path(data_root) / "user" / uh)
+        folder_id_user = f"gltd-notes-user-{uh[:12]}"
+        if folder_id_user not in folder_ids:
             self._api_post("config/folders", {
-                "id": "gltd-notes-data",
-                "label": "GLTD Notes",
-                "path": data_root,
+                "id": folder_id_user,
+                "label": "GLTD Notes — Minhas notas",
+                "path": user_path,
+                "type": "sendreceive",
+                "rescanIntervalS": 3600,
+            })
+
+        # Shared folder
+        shared_path = str(Path(data_root) / "shared")
+        if "gltd-notes-shared" not in folder_ids:
+            self._api_post("config/folders", {
+                "id": "gltd-notes-shared",
+                "label": "GLTD Notes — Compartilhados",
+                "path": shared_path,
                 "type": "sendreceive",
                 "rescanIntervalS": 3600,
             })
