@@ -3273,6 +3273,11 @@ class MainWindow(Gtk.Window):
                 self.api_server._httpd.shutdown()
             except Exception:
                 pass
+        if hasattr(self, "_sync_service") and self._sync_service:
+            try:
+                self._sync_service.stop()
+            except Exception:
+                pass
         if self._really_quit:
             Gtk.main_quit()
 
