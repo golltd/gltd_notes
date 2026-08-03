@@ -2,19 +2,21 @@
 # =============================================================================
 # GLTD Notes — Debian Package Builder
 # Gera um pacote .deb instalavel em /var/PROGRAMAS/gltd_notes
-# Uso: ./scripts/build_deb.sh
+# Uso: ./scripts/build_deb.sh [sufixo] [dir_saida]
+# Ex:  ./scripts/build_deb.sh _alpha /var/PROGRAMAS
 # =============================================================================
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION=$(grep -oP '[0-9]+\.[0-9]+\.[0-9]+' "$ROOT/gltd_notes/_version.py" | head -1)
+SUFFIX="${1:-}"
 ARCH="all"
 PACKAGE="gltd-notes"
-DEB_NAME="${PACKAGE}_${VERSION}_${ARCH}.deb"
+DEB_NAME="${PACKAGE}_${VERSION}${SUFFIX}_${ARCH}.deb"
 BUILD_DIR="$ROOT/build/deb"
 DEBIAN_DIR="$BUILD_DIR/DEBIAN"
 INSTALL_PREFIX="/var/PROGRAMAS/gltd_notes"
-OUTPUT_DIR="${1:-/var/PROGRAMAS}"
+OUTPUT_DIR="${2:-/var/PROGRAMAS}"
 
 echo "============================================"
 echo "  GLTD Notes — Gerador de Pacote .deb"
