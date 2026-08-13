@@ -3068,41 +3068,68 @@ class MainWindow(Gtk.Window):
     # ── Sync / Syncthing ──────────────────────────────────────
 
     def _start_sync(self) -> None:
-        from gltd_notes.services.syncthing_service import SyncthingService
+        GLib.idle_add(self._init_sync)
 
-        self._sync_service = SyncthingService(self.config)
-        if self._sync_service._mode == "none":
-            return
-        self._sync_btn.set_label("  Sync: iniciando...  ")
-        self._sync_btn.show()
-        if self._sync_service._mode == "embedded":
-            if not self._sync_service._bin_path().exists():
-                self._sync_btn.set_label("  Sync: binario nao encontrado  ")
-                dialog = Gtk.MessageDialog(
-                    transient_for=self,
-                    message_type=Gtk.MessageType.QUESTION,
-                    buttons=Gtk.ButtonsType.OK_CANCEL,
-                    text="Syncthing nao encontrado",
-                )
-                dialog.format_secondary_text(
-                    "O binario do Syncthing nao foi encontrado em:\n"
-                    f"{self._sync_service._bin_path()}\n\n"
-                    "Deseja baixar e instalar agora?\n"
-                    "(Configuracoes > Sync > Baixar / Instalar Syncthing)"
-                )
-                if dialog.run() == Gtk.ResponseType.OK:
-                    dialog.destroy()
-                    self._open_settings()
-                else:
-                    dialog.destroy()
-                return
-            ok = self._sync_service.start()
-            if not ok:
-                self._sync_btn.set_label("  Sync: falha ao iniciar  ")
+    def _init_sync(self) -> bool:
+        try:
+            import threading
+            from gltd_notes.services.syncthing_service import SyncthingService
+
+            self._sync_service = SyncthingService(self.config)
+            if self._sync_service._mode == "none":
+                return False
+            self._sync_btn.set_label("  Sync: iniciando...  ")
+            self._sync_btn.show()
+            if self._sync_service._mode == "embedded":
+                if not self._sync_service._bin_path().exists():
+                    self._sync_btn.set_label("  Sync: binario nao encontrado  ")
+                    GLib.idle_add(self._prompt_download_syncthing)
+                    return False
+
+                def _bg_start():
+                    try:
+                        ok = self._sync_service.start()
+                        def _done():
+                            if ok:
+                                GLib.timeout_add_seconds(5, self._update_sync_status)
+                            else:
+                                self._sync_btn.set_label("  Sync: falha ao iniciar  ")
+                            return False
+                        GLib.idle_add(_done)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger("gltd_notes").warning("Sync start error: %s", e)
+
+                threading.Thread(target=_bg_start, daemon=True).start()
             else:
                 GLib.timeout_add_seconds(5, self._update_sync_status)
-        else:
-            GLib.timeout_add_seconds(5, self._update_sync_status)
+        except Exception as e:
+            import logging
+            logging.getLogger("gltd_notes").warning("Erro ao iniciar sync: %s", e)
+            self._sync_btn.set_label("  Sync: erro  ")
+        return False
+
+    def _prompt_download_syncthing(self) -> bool:
+        try:
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                message_type=Gtk.MessageType.QUESTION,
+                buttons=Gtk.ButtonsType.OK_CANCEL,
+                text="Syncthing nao encontrado",
+            )
+            dialog.format_secondary_text(
+                "O binario do Syncthing nao foi encontrado.\n\n"
+                "Deseja baixar e instalar agora?\n"
+                "(Configuracoes > Sync > Baixar / Instalar Syncthing)"
+            )
+            if dialog.run() == Gtk.ResponseType.OK:
+                dialog.destroy()
+                self._open_settings()
+            else:
+                dialog.destroy()
+        except Exception:
+            pass
+        return False
 
     def _update_sync_status(self) -> bool:
         if not hasattr(self, "_sync_service"):
@@ -3313,7 +3340,22 @@ def run_gui() -> int:
     config = Config()
     config.migrate_password_flags()
     get_i18n(config.data.get("gui", {}).get("language") or "auto")
-    win = MainWindow(config)
+    try:
+        win = MainWindow(config)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        dialog = Gtk.MessageDialog(
+            parent=None,
+            flags=0,
+            type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            message_format=f"Erro ao iniciar GLTD Notes:\n{e}",
+        )
+        dialog.run()
+        dialog.destroy()
+        os.close(_lock_fd)
+        return 1
     win.show_all()
     Gtk.main()
     os.close(_lock_fd)
