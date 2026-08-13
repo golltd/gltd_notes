@@ -1705,9 +1705,7 @@ class MainWindow(Gtk.Window):
                 title = n.get("title") or t("untitled")
                 kind = n.get("kind") or "note"
                 if n.get("source") == "peer":
-                    peer = n.get("peer_hash", "")[:12]
                     self._note_owner[n["entity_id"]] = n.get("peer_hash", uh)
-                    title = f"[{peer}…] {title}"
                 else:
                     self._note_owner[n["entity_id"]] = uh
                 if kind == "tasklist":
@@ -1914,9 +1912,16 @@ class MainWindow(Gtk.Window):
         self._side_created.set_text(f"Criada: {str(created)[:22].replace('T', ' ')}")
         self._side_updated.set_text(f"Atualizada: {str(updated)[:22].replace('T', ' ')}")
         host = note.get("created_by_host") or note.get("updated_by_host") or "?"
+        machine = (note.get("updated_by_machine") or note.get("created_by_machine") or "")[:12]
         self._side_host.set_text(
-            f"Host: {host}\nMáquina: {(note.get('updated_by_machine') or '')[:12]}…"
+            f"Host: {host}\nMáquina: {machine}"
         )
+        owner_hash = self._current_note_owner or self._user_hash()
+        if owner_hash != self._user_hash():
+            self._side_host.set_text(
+                f"Origem: outra máquina ({owner_hash[:12]}…)\n"
+                f"Host: {host}\nMáquina: {machine}"
+            )
         markers = note.get("markers") or []
         self._side_markers.set_text("Marcadores: " + (" ".join(markers) if markers else "—"))
         fav = note.get("favorite") or False
@@ -1926,7 +1931,7 @@ class MainWindow(Gtk.Window):
             self._side_fav_btn.set_label("☆ Salvar como favorito")
         self._hist_store.clear()
         try:
-            hist = self.notes.history_grouped(self._user_hash(), note["entity_id"])
+            hist = self.notes.history_grouped(owner_hash, note["entity_id"])
         except Exception:
             hist = []
         for b in reversed(hist[-40:]):
