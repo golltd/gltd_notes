@@ -3112,7 +3112,9 @@ class MainWindow(Gtk.Window):
             if not running:
                 self._sync_btn.set_markup('<span foreground="#f7768e">  Sync: offline  </span>')
                 return True
-            uh = self._user_hash()[:12]
+            self._sync_service.approve_pending_devices()
+            self._sync_service.approve_pending_folders()
+            uh = self._user_hash()
             folder_id = f"gltd-notes-user-{uh}"
             status = self._sync_service.get_folder_status(folder_id)
             state = status.get("state", "unknown")

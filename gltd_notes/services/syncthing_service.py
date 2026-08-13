@@ -251,9 +251,9 @@ class SyncthingService:
         folder_ids = [f.get("id", "") for f in folders]
         uh = self.config.active_user_hash or "default"
 
-        # User's personal chain database
+        # User's personal chain database (full hash in ID for cross-machine path mapping)
         user_path = str(Path(data_root) / "user" / uh)
-        folder_id_user = f"gltd-notes-user-{uh[:12]}"
+        folder_id_user = f"gltd-notes-user-{uh}"
         if folder_id_user not in folder_ids:
             self._api_post("config/folders", {
                 "id": folder_id_user,
@@ -319,13 +319,78 @@ class SyncthingService:
             "compression": "metadata",
             "introducer": personal_network,
         })
+        # Share appropriate folders with the new device
         folders = self._api_get("config/folders") or []
         for f in folders:
-            fdevices = [d.get("deviceID") for d in f.get("devices", [])]
-            if device_id not in fdevices:
-                fdevices.append({"deviceID": device_id})
-                self._api_patch(f"config/folders/{f['id']}", {"devices": fdevices})
+            fid = f.get("id", "")
+            if personal_network:
+                should_share = fid.startswith("gltd-notes-")
+            else:
+                should_share = fid.startswith("gltd-shared-")
+            if not should_share:
+                continue
+            devices = list(f.get("devices", []) or [])
+            device_ids = [d.get("deviceID") for d in devices if isinstance(d, dict)]
+            if device_id not in device_ids:
+                devices.append({"deviceID": device_id})
+                self._api_patch(f"config/folders/{fid}", {"devices": devices})
         return True
+
+    def approve_pending_devices(self) -> int:
+        """Accept pending devices that are introduced to us."""
+        approved = 0
+        try:
+            pending = self._api_get("cluster/pending/devices") or {}
+            for did, info in pending.items():
+                name = info.get("name", did[:12])
+                self._api_post("config/devices", {
+                    "deviceID": did,
+                    "name": name,
+                    "addresses": ["dynamic"],
+                    "compression": "metadata",
+                })
+                approved += 1
+        except Exception:
+            pass
+        return approved
+
+    def approve_pending_folders(self) -> int:
+        """Accept pending folder offers from other devices."""
+        accepted = 0
+        try:
+            pending = self._api_get("cluster/pending/folders") or {}
+            for fid, info in pending.items():
+                if not fid.startswith("gltd-"):
+                    continue
+                offered = info.get("offeredBy", {})
+                offered_by = offered.get("deviceID", "")
+                label = info.get("label", fid)
+                data_root = str(self.config.data_root)
+                # Map folder ID to local path
+                if fid.startswith("gltd-notes-user-"):
+                    # Personal notes from another machine
+                    uh = fid[len("gltd-notes-user-"):]
+                    path = str(Path(data_root) / "user" / uh)
+                elif fid == "gltd-notes-shared":
+                    path = str(Path(data_root) / "shared")
+                elif fid.startswith("gltd-shared-"):
+                    username = fid[len("gltd-shared-"):]
+                    path = str(Path(data_root) / "shared" / f"@{username}")
+                else:
+                    continue
+                Path(path).mkdir(parents=True, exist_ok=True)
+                self._api_post("config/folders", {
+                    "id": fid,
+                    "label": label,
+                    "path": path,
+                    "type": "sendreceive",
+                    "rescanIntervalS": 3600,
+                    "devices": [{"deviceID": offered_by}],
+                })
+                accepted += 1
+        except Exception:
+            pass
+        return accepted
 
     def remove_device(self, device_id: str) -> bool:
         existing = self._api_get("config/devices") or []
