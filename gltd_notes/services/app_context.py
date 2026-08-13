@@ -84,3 +84,19 @@ class AppContext:
 
     def all_chain_names(self) -> tuple:
         return CHAIN_NAMES
+
+    def list_local_user_hashes(self) -> list:
+        """List all user-hash directories present under data_root/user/.
+
+        Includes the current user plus any other machine's folders synced
+        via Syncthing (same-network sharing).
+        """
+        user_dir = self.config.data_root / "user"
+        hashes = []
+        try:
+            for child in user_dir.iterdir():
+                if child.is_dir() and len(child.name) >= 12:
+                    hashes.append(child.name)
+        except OSError:
+            pass
+        return hashes

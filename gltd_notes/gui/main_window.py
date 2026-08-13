@@ -282,6 +282,8 @@ class MainWindow(Gtk.Window):
         self._agent_flush_id: Optional[int] = None
         self._context_tab_page: int = -1
         self._current_view_kind: Optional[str] = None  # "note", "agent_task", "event"
+        self._note_owner: Dict[str, str] = {}
+        self._current_note_owner: Optional[str] = None
 
         self._tab_context_menu = Gtk.Menu()
         mi = Gtk.MenuItem(label="Fechar aba")
@@ -1696,11 +1698,18 @@ class MainWindow(Gtk.Window):
             if self._current_view_kind and self._current_view_kind != "event":
                 self._note_list = [n for n in self._note_list if (n.get("kind") or "note") == self._current_view_kind]
             self._note_list.sort(key=lambda n: (0 if n.get("favorite") else 1, n.get("updated_at") or ""), reverse=False)
+            self._note_owner = {}
             self.store.clear()
             for n in self._note_list:
                 updated = (n.get("updated_at") or "")[:19].replace("T", " ")
                 title = n.get("title") or t("untitled")
                 kind = n.get("kind") or "note"
+                if n.get("source") == "peer":
+                    peer = n.get("peer_hash", "")[:12]
+                    self._note_owner[n["entity_id"]] = n.get("peer_hash", uh)
+                    title = f"[{peer}…] {title}"
+                else:
+                    self._note_owner[n["entity_id"]] = uh
                 if kind == "tasklist":
                     open_c = n.get("task_open_count")
                     if open_c is None:
@@ -1861,10 +1870,12 @@ class MainWindow(Gtk.Window):
         self._loading_note = True
         try:
             try:
-                note = self.notes.get_note(self._user_hash(), note_id, include_body=True)
+                owner_hash = getattr(self, "_note_owner", {}).get(note_id, self._user_hash())
+                note = self.notes.get_note(owner_hash, note_id, include_body=True)
             except KeyError:
                 return
             self._current_note_id = note_id
+            self._current_note_owner = owner_hash
             self._current_kind = note.get("kind") or "note"
             self._set_editor_chrome_visible(True)
             self._select_id(note_id)
@@ -2511,6 +2522,7 @@ class MainWindow(Gtk.Window):
         markers = self._parse_markers_field()
         note_id = self._current_note_id
         kind = self._current_kind
+        owner = self._current_note_owner or self._user_hash()
 
         def finish_ok() -> None:
             if not silent:
@@ -2524,9 +2536,9 @@ class MainWindow(Gtk.Window):
         try:
             if kind == "tasklist":
                 tasks = self.task_editor.get_tasks()
-                self.tasks.save_tasks(self._user_hash(), note_id, tasks, title=title)
+                self.tasks.save_tasks(owner, note_id, tasks, title=title)
                 self.notes.update_note(
-                    self._user_hash(),
+                    owner,
                     note_id,
                     extra_payload={"markers": markers},
                     kind="tasklist",
@@ -2539,9 +2551,9 @@ class MainWindow(Gtk.Window):
                 for k in ("parent_id", "related_ids", "executed_at"):
                     if base.get(k) is not None and not data.get(k):
                         data[k] = base[k]
-                self.agents.save_data(self._user_hash(), note_id, data, title=title)
+                self.agents.save_data(owner, note_id, data, title=title)
                 self.notes.update_note(
-                    self._user_hash(),
+                    owner,
                     note_id,
                     extra_payload={"markers": markers},
                     kind="agent_task",
@@ -2554,7 +2566,7 @@ class MainWindow(Gtk.Window):
                         if self._current_note_id != note_id:
                             return
                         self.notes.update_note(
-                            self._user_hash(),
+                            owner,
                             note_id,
                             title=title,
                             body=html or "",
@@ -2598,8 +2610,9 @@ class MainWindow(Gtk.Window):
         self._cancel_agent_flush()
         self._agent_note_id = None
         was_current = (note_id == self._current_note_id)
+        owner = getattr(self, "_note_owner", {}).get(note_id, self._user_hash())
         self._current_note_id = None
-        self.notes.delete_note(self._user_hash(), note_id)
+        self.notes.delete_note(owner, note_id)
         self._refresh_all()
         page = self._find_tab_page(note_id)
         if page >= 0:
@@ -3099,6 +3112,11 @@ class MainWindow(Gtk.Window):
                     except Exception as e:
                         import logging
                         logging.getLogger("gltd_notes").warning("Sync start error: %s", e)
+
+                        def _err():
+                            self._sync_btn.set_label("  Sync: erro  ")
+                            return False
+                        GLib.idle_add(_err)
 
                 threading.Thread(target=_bg_start, daemon=True).start()
             else:

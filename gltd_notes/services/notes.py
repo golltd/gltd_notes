@@ -426,6 +426,7 @@ class NotesService:
         include_shared: bool = True,
         include_body: bool = False,
         marker: Optional[str] = None,
+        include_peers: bool = True,
     ) -> List[Dict[str, Any]]:
         # list_entities() loads the chain once per call — do not call get_note() per item
         notes = self.ctx.user_chain(user_hash, "notes").list_entities()
@@ -436,6 +437,22 @@ class NotesService:
             n.clear()
             n.update(overlaid)
             n["source"] = "user"
+        if include_peers:
+            # Read notes from other machines' synced folders (same network)
+            seen = {n["entity_id"] for n in notes}
+            for peer_hash in self.ctx.list_local_user_hashes():
+                if peer_hash == user_hash:
+                    continue
+                try:
+                    peer_notes = self.ctx.user_chain(peer_hash, "notes").list_entities()
+                except Exception:
+                    continue
+                for p in peer_notes:
+                    if p.get("entity_id") in seen:
+                        continue
+                    p["source"] = "peer"
+                    p["peer_hash"] = peer_hash
+                    notes.append(p)
         if include_shared:
             shared = self.ctx.shared_chain("notes").list_entities(
                 predicate=lambda e: (
