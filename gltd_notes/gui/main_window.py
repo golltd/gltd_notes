@@ -3141,6 +3141,7 @@ class MainWindow(Gtk.Window):
                 return True
             self._sync_service.approve_pending_devices()
             self._sync_service.approve_pending_folders()
+            self._sync_service.ensure_folder_sharing()
             uh = self._user_hash()
             folder_id = f"gltd-notes-user-{uh}"
             status = self._sync_service.get_folder_status(folder_id)

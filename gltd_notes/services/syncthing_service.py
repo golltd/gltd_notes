@@ -324,21 +324,48 @@ class SyncthingService:
             })
         return result
 
+    def _personal_devices(self) -> List[str]:
+        return self.config.data.get("syncthing", {}).get("personal_devices", [])
+
+    def _set_personal_device(self, device_id: str, personal: bool) -> None:
+        sc = self.config.data.setdefault("syncthing", {})
+        devs = set(sc.get("personal_devices", []))
+        if personal:
+            devs.add(device_id)
+        else:
+            devs.discard(device_id)
+        sc["personal_devices"] = sorted(devs)
+        try:
+            self.config.save()
+        except Exception:
+            pass
+
     def add_device(self, device_id: str, name: str = "", personal_network: bool = False) -> bool:
         existing = self._api_get("config/devices") or []
-        if any(d.get("deviceID") == device_id for d in existing):
-            return True
-        self._api_post("config/devices", {
-            "deviceID": device_id,
-            "name": name or device_id[:12],
-            "addresses": ["dynamic"],
-            "compression": "metadata",
-            "introducer": personal_network,
-        })
-        # Share appropriate folders with the new device
+        exists = any(d.get("deviceID") == device_id for d in existing)
+        if exists:
+            self._api_patch(f"config/devices/{device_id}", {
+                "name": name or device_id[:12],
+            })
+        else:
+            self._api_post("config/devices", {
+                "deviceID": device_id,
+                "name": name or device_id[:12],
+                "addresses": ["dynamic"],
+                "compression": "metadata",
+                "introducer": personal_network,
+            })
+        self._set_personal_device(device_id, personal_network)
+        # Share appropriate folders with the device (idempotent)
+        self._share_folders_with_device(device_id, personal_network)
+        return True
+
+    def _share_folders_with_device(self, device_id: str, personal_network: bool) -> None:
         folders = self._api_get("config/folders") or []
         for f in folders:
             fid = f.get("id", "")
+            if not fid:
+                continue
             if personal_network:
                 should_share = fid.startswith("gltd-notes-")
             else:
@@ -350,7 +377,39 @@ class SyncthingService:
             if device_id not in device_ids:
                 devices.append({"deviceID": device_id})
                 self._api_patch(f"config/folders/{fid}", {"devices": devices})
-        return True
+
+    def ensure_folder_sharing(self) -> int:
+        """Repair folder sharing based on personal_devices config. Returns changes made."""
+        changes = 0
+        try:
+            devices = self._api_get("config/devices") or []
+            folders = self._api_get("config/folders") or []
+            my_id = (self._api_get("system/status") or {}).get("myID", "")
+            personal_ids = set(self._personal_devices())
+            for d in devices:
+                did = d.get("deviceID", "")
+                if not did or did == my_id:
+                    continue
+                personal = did in personal_ids
+                for f in folders:
+                    fid = f.get("id", "")
+                    if not fid:
+                        continue
+                    if personal:
+                        should_share = fid.startswith("gltd-notes-")
+                    else:
+                        should_share = fid.startswith("gltd-shared-")
+                    if not should_share:
+                        continue
+                    devs = list(f.get("devices", []) or [])
+                    dev_ids = [x.get("deviceID") for x in devs if isinstance(x, dict)]
+                    if did not in dev_ids:
+                        devs.append({"deviceID": did})
+                        self._api_patch(f"config/folders/{fid}", {"devices": devs})
+                        changes += 1
+        except Exception:
+            pass
+        return changes
 
     def approve_pending_devices(self) -> int:
         """Accept pending devices that are introduced to us."""
