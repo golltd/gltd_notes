@@ -35,12 +35,33 @@ class SyncthingService:
         if self._mode == "embedded":
             self._api_url = f"http://127.0.0.1:{sc.get('port', DEFAULT_GUI_PORT)}"
             self._api_key = sc.get("api_key", "")
+            if not self._api_key:
+                self._api_key = self._read_api_key_from_xml()
         elif self._mode == "external":
             self._api_url = sc.get("api_url", "http://127.0.0.1:8384")
             self._api_key = sc.get("api_key", "")
         else:
             self._api_url = ""
             self._api_key = ""
+
+    def _read_api_key_from_xml(self) -> str:
+        import xml.etree.ElementTree as ET
+
+        config_xml = self._home_dir() / "config.xml"
+        if not config_xml.exists():
+            return ""
+        try:
+            tree = ET.parse(str(config_xml))
+            root = tree.getroot()
+            ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+            gui = root.find(f"{{{ns}}}gui") if ns else root.find("gui")
+            if gui is not None:
+                apikey_el = gui.find(f"{{{ns}}}apikey") if ns else gui.find("apikey")
+                if apikey_el is not None and apikey_el.text:
+                    return apikey_el.text
+        except Exception:
+            pass
+        return ""
 
     def _bin_path(self) -> Path:
         custom = self.config.data.get("syncthing", {}).get("bin_path", "")
@@ -186,34 +207,21 @@ class SyncthingService:
             return self.ping()
 
     def _ensure_device_name(self) -> None:
-        """Update device name in config.xml if not matching expected pattern."""
-        import xml.etree.ElementTree as ET
-
-        config_xml = self._home_dir() / "config.xml"
-        if not config_xml.exists():
-            return
+        """Set local device name via API to gltd_notes_HOSTNAME."""
+        expected = f"gltd_notes_{socket.gethostname()}"
         try:
-            expected = f"gltd_notes_{socket.gethostname()}"
-            ET.register_namespace("", "http://syncthing.net/ns/config/1")
-            tree = ET.parse(str(config_xml))
-            root = tree.getroot()
-            ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
-
-            def _find(parent, tag):
-                return parent.find(f"{{{ns}}}{tag}") if ns else parent.find(tag)
-
-            opts = _find(root, "options")
-            if opts is not None:
-                dn = _find(opts, "deviceName")
-                if dn is not None and dn.text == expected:
+            status = self._api_get("system/status") or {}
+            my_id = status.get("myID", "")
+            if not my_id:
+                return
+            devices = self._api_get("config/devices") or []
+            for d in devices:
+                if d.get("deviceID") == my_id and d.get("name") == expected:
                     return
-                if dn is None:
-                    dn = ET.SubElement(opts, f"{{{ns}}}deviceName" if ns else "deviceName")
-                dn.text = expected
-                tree.write(str(config_xml), encoding="utf-8", xml_declaration=True)
-                _log.info("Syncthing device name updated to: %s", expected)
-        except Exception:
-            pass
+            self._api_patch(f"config/devices/{my_id}", {"name": expected})
+            _log.info("Syncthing device name set to: %s", expected)
+        except Exception as e:
+            _log.debug("set device name failed: %s", e)
 
     def _ensure_api_key(self) -> None:
         time.sleep(2)
@@ -241,7 +249,12 @@ class SyncthingService:
             if apikey_el is not None and apikey_el.text:
                 self._api_key = apikey_el.text
                 sc = self.config.data.setdefault("syncthing", {})
-                sc["api_key"] = self._api_key
+                if sc.get("api_key") != self._api_key:
+                    sc["api_key"] = self._api_key
+                    try:
+                        self.config.save()
+                    except Exception:
+                        pass
 
     # ── folder config ───────────────────────────────────────────
 
@@ -295,11 +308,14 @@ class SyncthingService:
     def get_devices(self) -> List[Dict[str, Any]]:
         cfg = self._api_get("config/devices") or []
         status = self._api_get("system/connections") or {}
-        conns = {c.get("deviceID", ""): c for c in status.get("connections", {})}
+        conns = status.get("connections", {}) or {}
+        my_id = (self._api_get("system/status") or {}).get("myID", "")
         result = []
         for d in cfg:
             did = d.get("deviceID", "")
-            conn = conns.get(did, {})
+            if did == my_id:
+                continue
+            conn = conns.get(did, {}) if isinstance(conns, dict) else {}
             result.append({
                 "deviceID": did,
                 "name": d.get("name", did[:12]),
@@ -373,6 +389,9 @@ class SyncthingService:
                     path = str(Path(data_root) / "user" / uh)
                 elif fid == "gltd-notes-shared":
                     path = str(Path(data_root) / "shared")
+                elif fid == "gltd-notes-data":
+                    # Legacy folder ID from older alpha versions — map to data root
+                    path = data_root
                 elif fid.startswith("gltd-shared-"):
                     username = fid[len("gltd-shared-"):]
                     path = str(Path(data_root) / "shared" / f"@{username}")
