@@ -284,6 +284,9 @@ class MainWindow(Gtk.Window):
         self._current_view_kind: Optional[str] = None  # "note", "agent_task", "event"
         self._note_owner: Dict[str, str] = {}
         self._current_note_owner: Optional[str] = None
+        self._sync_baseline: Dict[str, str] = {}
+        self._sync_changed_count: int = 0
+        self._sync_last_note: Optional[str] = None
 
         self._tab_context_menu = Gtk.Menu()
         mi = Gtk.MenuItem(label="Fechar aba")
@@ -1697,7 +1700,12 @@ class MainWindow(Gtk.Window):
             self._note_list = self.notes.list_notes(uh, query=q)
             if self._current_view_kind and self._current_view_kind != "event":
                 self._note_list = [n for n in self._note_list if (n.get("kind") or "note") == self._current_view_kind]
-            self._note_list.sort(key=lambda n: (0 if n.get("favorite") else 1, n.get("updated_at") or ""), reverse=False)
+            # Favorites first, then most recently created/updated
+            favorites = [n for n in self._note_list if n.get("favorite")]
+            others = [n for n in self._note_list if not n.get("favorite")]
+            favorites.sort(key=lambda n: n.get("updated_at") or n.get("created_at") or "", reverse=True)
+            others.sort(key=lambda n: n.get("updated_at") or n.get("created_at") or "", reverse=True)
+            self._note_list = favorites + others
             self._note_owner = {}
             self.store.clear()
             for n in self._note_list:
@@ -3096,6 +3104,7 @@ class MainWindow(Gtk.Window):
             self._sync_service = SyncthingService(self.config)
             if self._sync_service._mode == "none":
                 return False
+            self._record_sync_baseline()
             self._sync_btn.set_label("  Sync: iniciando...  ")
             self._sync_btn.show()
             if self._sync_service._mode == "embedded":
@@ -3154,6 +3163,45 @@ class MainWindow(Gtk.Window):
             pass
         return False
 
+    def _record_sync_baseline(self) -> None:
+        try:
+            uh = self._user_hash()
+            all_notes = self.notes.list_notes(uh, include_body=False)
+            self._sync_baseline = {}
+            for n in all_notes:
+                self._sync_baseline[n["entity_id"]] = n.get("updated_at") or ""
+        except Exception:
+            pass
+
+    def _update_sync_dashboard(self) -> None:
+        try:
+            uh = self._user_hash()
+            all_notes = self.notes.list_notes(uh, include_body=False)
+            changed = 0
+            last_note = None
+            last_ts = ""
+            for n in all_notes:
+                nid = n["entity_id"]
+                ts = n.get("updated_at") or ""
+                prev = self._sync_baseline.get(nid)
+                if prev is None or prev != ts:
+                    changed += 1
+                if ts > last_ts:
+                    last_ts = ts
+                    last_note = n
+            self._sync_changed_count = changed
+            self._sync_last_note = last_note
+            if last_note:
+                src = "peer" if last_note.get("source") == "peer" else "local"
+                title = (last_note.get("title") or "")[:30]
+                self._sync_btn.set_tooltip_text(
+                    f"Notas alteradas desde o inicio: {changed}\n"
+                    f"Ultima nota: {title}\n"
+                    f"Origem: {src}"
+                )
+        except Exception:
+            pass
+
     def _update_sync_status(self) -> bool:
         if not hasattr(self, "_sync_service"):
             return False
@@ -3165,18 +3213,20 @@ class MainWindow(Gtk.Window):
             self._sync_service.approve_pending_devices()
             self._sync_service.approve_pending_folders()
             self._sync_service.ensure_folder_sharing()
+            self._update_sync_dashboard()
             uh = self._user_hash()
             folder_id = f"gltd-notes-user-{uh}"
             status = self._sync_service.get_folder_status(folder_id)
             state = status.get("state", "unknown")
+            changed = self._sync_changed_count
             if state == "idle":
-                self._sync_btn.set_markup('<span foreground="#9ece6a">  Sync: OK  </span>')
+                self._sync_btn.set_markup(f'<span foreground="#9ece6a">  Sync: OK · {changed} alt.  </span>')
             elif state in ("syncing", "scanning"):
                 comp = self._sync_service.get_completion(folder_id)
                 pct = int(comp.get("completion", 0))
-                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {pct}%  </span>')
+                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {pct}% · {changed} alt.  </span>')
             else:
-                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {state}  </span>')
+                self._sync_btn.set_markup(f'<span foreground="#e0af68">  Sync: {state} · {changed} alt.  </span>')
         except Exception:
             self._sync_btn.set_label("  Sync: —  ")
         return True

@@ -320,6 +320,14 @@ class NotesService:
             if k not in payload and k in existing:
                 payload[k] = existing[k]
 
+        # Metadata changes (title/markers) are meaningful → always create history
+        if title is not None and title != (existing.get("title") or ""):
+            force_history = True
+        if extra_payload and "markers" in extra_payload:
+            new_markers = normalize_markers(extra_payload.get("markers"))
+            if new_markers != list(existing.get("markers") or []):
+                force_history = True
+
         checkpoint = self._should_checkpoint(
             user_hash, note_id, existing, body, force_history=force_history
         )
